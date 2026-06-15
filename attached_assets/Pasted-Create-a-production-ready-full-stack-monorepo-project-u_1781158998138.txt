@@ -1,0 +1,75 @@
+Create a production-ready full-stack monorepo project using the following stack:
+
+- Frontend: React + TypeScript (Vite)
+- Backend: Node.js + Express + TypeScript
+- Database: MongoDB with Mongoose
+- Package Manager: pnpm
+- OS compatibility: Windows (no Linux-only commands)
+
+Requirements:
+
+1. Use a monorepo structure:
+   apps/
+     client/   (React app)
+     server/   (Express API)
+   packages/   (optional shared code)
+
+2. Backend (apps/server):
+   - Use TypeScript with ES Modules
+   - Structure code into:
+     - config/ (database connection)
+     - models/ (Mongoose schemas)
+     - controllers/ (business logic)
+     - routes/ (API routes)
+     - middlewares/ (error handling)
+   - Implement:
+     - MongoDB connection using Mongoose
+     - Environment variables using dotenv
+     - Centralized error handling middleware
+     - Example resource (e.g., User) with full CRUD APIs
+   - Use best practices:
+     - async/await
+     - proper status codes
+     - validation-ready structure
+   - Dev script must use:
+     tsx watch (no nodemon, no bash)
+
+3. Frontend (apps/client):
+   - Use React + TypeScript (Vite)
+   - Structure:
+     - components/
+     - api/ (API service layer)
+     - pages/ (optional)
+   - Implement:
+     - API integration with backend (fetch or axios)
+     - Form to create data (e.g., user)
+     - List view to fetch and display data
+   - Use clean component structure (no inline logic mess)
+
+4. Root configuration:
+   - pnpm workspace setup
+   - Root scripts:
+     - "dev" → run both frontend and backend using concurrently
+     - "build" → build all apps
+   - Use cross-platform tools:
+     - cross-env (for env variables)
+     - rimraf (for cleanup)
+
+5. Constraints:
+   - Do NOT use any Linux-only commands (no sh, rm, export)
+   - Use only cross-platform Node.js-compatible tools
+   - Use ES module syntax (import/export)
+   - Code must be clean, modular, and scalable (not demo-level)
+
+6. Output must include:
+   - Full folder structure
+   - All package.json files
+   - Backend implementation (routes, controllers, models, DB config)
+   - Frontend implementation (components, API calls)
+   - Environment variable setup (.env example)
+   - Working scripts to run project with:
+     pnpm install
+     pnpm dev
+
+Goal:
+Produce a clean, production-ready starter project that can be directly used and extended in a real-world application.

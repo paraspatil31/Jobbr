@@ -1,0 +1,17 @@
+{
+  "name": "@workspace/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./models": "./src/models/index.ts"
+  },
+  "scripts": {},
+  "dependencies": {
+    "mongoose": "^8.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  }
+}
