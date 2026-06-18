@@ -142,6 +142,45 @@ export async function updateUser(
   }
 }
 
+export async function nearbySeekers(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { latitude, longitude, radius = "25000" } = req.query as Record<string, string>;
+    const lat = parseFloat(latitude ?? "");
+    const lng = parseFloat(longitude ?? "");
+    const maxDistance = parseFloat(radius);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      res.json({ seekers: [], total: 0 });
+      return;
+    }
+
+    try {
+      const seekers = await UserModel.aggregate([
+        {
+          $geoNear: {
+            near: { type: "Point" as const, coordinates: [lng, lat] },
+            distanceField: "distance",
+            maxDistance: isNaN(maxDistance) ? 25000 : maxDistance,
+            spherical: true,
+            query: { role: "seeker" },
+          },
+        },
+        { $limit: 200 },
+        { $project: { password: 0 } },
+      ]);
+      res.json({ seekers, total: seekers.length });
+    } catch {
+      res.json({ seekers: [], total: 0 });
+    }
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function deleteUser(
   req: Request,
   res: Response,

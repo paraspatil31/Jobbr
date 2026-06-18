@@ -6,6 +6,7 @@ export interface IUser extends Document {
   email: string;
   password: string;
   location: string;
+  geoLocation?: { type: "Point"; coordinates: [number, number] };
   companyName?: string;
   jobTitle?: string;
   skills?: string[];
@@ -27,6 +28,10 @@ const userSchema = new mongoose.Schema<IUser>(
     },
     password: { type: String, required: true },
     location: { type: String, required: true, trim: true },
+    geoLocation: {
+      type: { type: String, enum: ["Point"] },
+      coordinates: { type: [Number] },
+    },
     companyName: { type: String, trim: true },
     jobTitle: { type: String, trim: true },
     skills: [{ type: String }],
@@ -34,6 +39,8 @@ const userSchema = new mongoose.Schema<IUser>(
   },
   { timestamps: true }
 );
+
+userSchema.index({ geoLocation: "2dsphere" }, { sparse: true });
 
 export const UserModel: Model<IUser> =
   mongoose.models["User"] ?? mongoose.model<IUser>("User", userSchema);

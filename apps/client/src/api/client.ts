@@ -25,7 +25,14 @@ export async function request<T>(
     },
   });
 
-  const data = (await res.json()) as T | { message?: string; error?: string };
+  const text = await res.text();
+  let data: T | { message?: string; error?: string };
+  try {
+    data = text ? (JSON.parse(text) as T | { message?: string; error?: string }) : ({} as T);
+  } catch {
+    if (!res.ok) throw new ApiError(res.status, `Request failed (${res.status})`);
+    return {} as T;
+  }
 
   if (!res.ok) {
     const errData = data as { message?: string; error?: string };

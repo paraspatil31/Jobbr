@@ -1,475 +1,694 @@
-import { useState, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { MapPin, Briefcase, Linkedin, Twitter, Github, Search, Filter, ChevronDown, ExternalLink } from "lucide-react";
-import { motion, useScroll, useTransform } from "framer-motion";
-
-const JobMap = lazy(() => import("@/components/JobMap"));
+import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import {
+  MapPin, Briefcase, Globe, Search, ChevronDown,
+  LogOut, Bell, Bookmark, FileText, Settings2, Users,
+  Zap, Shield, Target, Twitter, Linkedin, Github, Loader2,
+  Building2, UserCircle, DollarSign, Filter, X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { getUser, clearSession, type AuthUser } from "@/lib/api";
+import type { CategoryLegendItem } from "@/components/JobMap";
+import { jobsApi, type Job as ApiJob } from "@/api/jobs";
 
-export default function Home() {
-  const [, navigate] = useLocation();
+const JobMap = lazy(() => import("@/components/JobMap"));
+
+/* ─── Nav items ──────────────────────────────────────────────── */
+const PUBLIC_NAV = [
+  { label: "Home", href: "/" },
+  { label: "Browse Jobs", href: "/explore" },
+  { label: "About", href: "#about" },
+];
+const SEEKER_NAV = [
+  { label: "Home", href: "/" },
+  { label: "Browse Jobs", href: "/explore" },
+];
+const LANGUAGES = ["EN", "FR", "ES", "DE", "AR"];
+
+/* ─── Globe / language menu ──────────────────────────────────── */
+function GlobeMenu({ lang, setLang }: { lang: string; setLang: (l: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(o => !o)} title="Language"
+        className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors">
+        <Globe className="w-[18px] h-[18px]" />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ opacity: 0, y: 6, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.96 }} transition={{ duration: 0.12 }}
+            className="absolute right-0 top-11 bg-white rounded-xl shadow-lg border border-border/60 py-1 w-24 z-50">
+            {LANGUAGES.map(l => (
+              <button key={l} onClick={() => { setLang(l); setOpen(false); }}
+                className={`w-full text-left px-4 py-2 text-sm font-medium transition-colors ${lang === l ? "text-primary bg-primary/5" : "text-foreground hover:bg-secondary"}`}>
+                {l}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ─── Profile dropdown ───────────────────────────────────────── */
+const PROFILE_ITEMS = [
+  { icon: UserCircle, label: "My Profile",    href: "/profile" },
+  { icon: FileText,   label: "Applied Jobs",  href: "/applied-jobs" },
+  { icon: Bookmark,   label: "Saved Jobs",    href: "/saved-jobs" },
+  { icon: Settings2,  label: "Settings",      href: "/profile" },
+];
+
+function ProfileMenu({ user, navigate }: { user: AuthUser; navigate: (p: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setConfirmLogout(false);
+      }
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  const handleLogout = () => { clearSession(); window.location.href = "/"; };
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => { setOpen(o => !o); setConfirmLogout(false); }}
+        className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center text-primary font-bold text-sm hover:bg-primary/25 transition-colors">
+        {user.fullName?.[0]?.toUpperCase() ?? "U"}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ opacity: 0, y: 6, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.96 }} transition={{ duration: 0.12 }}
+            className="absolute right-0 top-11 bg-white rounded-xl shadow-lg border border-border/60 py-1 w-56 z-50">
+            <div className="px-4 py-3 border-b border-border/40">
+              <p className="text-sm font-bold text-foreground truncate">{user.fullName}</p>
+              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+            </div>
+            {PROFILE_ITEMS.map(({ icon: Icon, label, href }) => (
+              <button key={label} onClick={() => { navigate(href); setOpen(false); setConfirmLogout(false); }}
+                className="w-full text-left px-4 py-2.5 text-sm text-foreground hover:bg-secondary flex items-center gap-3 transition-colors">
+                <Icon className="w-4 h-4 text-muted-foreground" />{label}
+              </button>
+            ))}
+            <div className="border-t border-border/40 mt-1">
+              {confirmLogout ? (
+                <div className="px-4 py-3">
+                  <p className="text-xs text-muted-foreground mb-2.5 font-medium">Are you sure you want to log out?</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setConfirmLogout(false)}
+                      className="flex-1 py-1.5 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-secondary transition-colors">
+                      Cancel
+                    </button>
+                    <button onClick={handleLogout}
+                      className="flex-1 py-1.5 rounded-lg bg-destructive text-white text-xs font-semibold hover:bg-destructive/90 transition-colors">
+                      Log Out
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setConfirmLogout(true)}
+                  className="w-full text-left px-4 py-2.5 text-sm text-destructive hover:bg-destructive/5 flex items-center gap-3 transition-colors">
+                  <LogOut className="w-4 h-4" />Logout
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ─── Notification bell ──────────────────────────────────────── */
+function NotificationBell() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(o => !o)} title="Notifications"
+        className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors relative">
+        <Bell className="w-[18px] h-[18px]" />
+        <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary border-2 border-white" />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ opacity: 0, y: 6, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.96 }} transition={{ duration: 0.12 }}
+            className="absolute right-0 top-11 bg-white rounded-xl shadow-lg border border-border/60 w-80 z-50 overflow-hidden">
+            <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between">
+              <p className="text-sm font-bold">Notifications</p>
+              <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">0 new</span>
+            </div>
+            <div className="py-12 flex flex-col items-center text-center px-6">
+              <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center mb-3">
+                <Bell className="w-6 h-6 text-muted-foreground/40" />
+              </div>
+              <p className="text-sm font-semibold text-foreground">No new notifications</p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                We'll let you know when new jobs matching your profile are posted nearby.
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ─── Stats section ──────────────────────────────────────────── */
+const STATS = [
+  { value: "10,000+", label: "Active Jobs" },
+  { value: "2,500+", label: "Employers" },
+  { value: "50+", label: "Cities" },
+  { value: "100,000+", label: "Applications" },
+];
+
+function StatsSection() {
+  return (
+    <section className="py-20 bg-white relative z-10">
+      <div className="container mx-auto px-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+          {STATS.map((s, i) => (
+            <motion.div key={s.label} initial={{ y: 30, opacity: 0 }} whileInView={{ y: 0, opacity: 1 }}
+              viewport={{ once: true }} transition={{ delay: i * 0.1 }}
+              className="text-center p-6 rounded-2xl bg-primary/5 border border-primary/10">
+              <p className="text-3xl font-extrabold text-primary mb-1">{s.value}</p>
+              <p className="text-sm font-medium text-muted-foreground">{s.label}</p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Why Choose section ─────────────────────────────────────── */
+const WHY_FEATURES = [
+  { icon: MapPin, title: "Location-Based Search", desc: "Find jobs near your current location." },
+  { icon: Zap, title: "Quick Apply", desc: "Apply to jobs in seconds." },
+  { icon: Shield, title: "Verified Companies", desc: "Only trusted and verified employers." },
+  { icon: Target, title: "Radius-Based Matching", desc: "Jobs filtered based on your selected radius." },
+];
+
+function WhyChooseSection() {
+  return (
+    <section className="py-24 bg-background relative z-10">
+      <div className="absolute inset-0 bg-primary/3 -skew-y-2 transform origin-top-left z-0" />
+      <div className="container mx-auto px-4 relative z-10">
+        <motion.div initial={{ y: 20, opacity: 0 }} whileInView={{ y: 0, opacity: 1 }} viewport={{ once: true }} className="text-center mb-14">
+          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">
+            Why Choose <span className="text-primary">JobNearby?</span>
+          </h2>
+          <p className="text-muted-foreground max-w-xl mx-auto">Built for local job markets — fast, verified, and radius-aware.</p>
+        </motion.div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+          {WHY_FEATURES.map(({ icon: Icon, title, desc }, i) => (
+            <motion.div key={title} initial={{ y: 30, opacity: 0 }} whileInView={{ y: 0, opacity: 1 }}
+              viewport={{ once: true }} transition={{ delay: i * 0.1 }}
+              className="bg-white/70 backdrop-blur-sm border border-white/60 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+                <Icon className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="font-bold text-foreground mb-2">{title}</h3>
+              <p className="text-sm text-muted-foreground">{desc}</p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── How It Works section ───────────────────────────────────── */
+const HOW_SEEKER = [{ n: 1, label: "Set Location" }, { n: 2, label: "Browse Nearby Jobs" }, { n: 3, label: "Apply Instantly" }];
+const HOW_RECRUITER = [{ n: 1, label: "Post Job" }, { n: 2, label: "Receive Applications" }, { n: 3, label: "Hire Local Talent" }];
+
+function HowItWorksSection() {
+  return (
+    <section className="py-24 bg-white relative z-10">
+      <div className="container mx-auto px-4">
+        <motion.div initial={{ y: 20, opacity: 0 }} whileInView={{ y: 0, opacity: 1 }} viewport={{ once: true }} className="text-center mb-14">
+          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">
+            How <span className="text-primary">JobNearby</span> Works
+          </h2>
+          <p className="text-muted-foreground max-w-xl mx-auto">Simple steps for seekers and recruiters alike.</p>
+        </motion.div>
+        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <motion.div initial={{ x: -30, opacity: 0 }} whileInView={{ x: 0, opacity: 1 }} viewport={{ once: true }}
+            className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-3xl p-8 border border-primary/15">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                <Users className="w-5 h-5 text-primary" />
+              </div>
+              <h3 className="font-extrabold text-lg">For Job Seekers</h3>
+            </div>
+            <div className="space-y-4">
+              {HOW_SEEKER.map(({ n, label }) => (
+                <div key={n} className="flex items-center gap-4">
+                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm flex-shrink-0">{n}</div>
+                  <p className="font-medium">{label}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+          <motion.div initial={{ x: 30, opacity: 0 }} whileInView={{ x: 0, opacity: 1 }} viewport={{ once: true }}
+            className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl p-8 border border-blue-100">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-blue-600" />
+              </div>
+              <h3 className="font-extrabold text-lg">For Recruiters</h3>
+            </div>
+            <div className="space-y-4">
+              {HOW_RECRUITER.map(({ n, label }) => (
+                <div key={n} className="flex items-center gap-4">
+                  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">{n}</div>
+                  <p className="font-medium">{label}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── CTA section ────────────────────────────────────────────── */
+function CTASection({ navigate }: { navigate: (p: string) => void }) {
+  return (
+    <section className="py-24 bg-primary relative overflow-hidden z-10">
+      <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+      <div className="container mx-auto px-4 text-center relative z-10">
+        <motion.div initial={{ y: 30, opacity: 0 }} whileInView={{ y: 0, opacity: 1 }} viewport={{ once: true }}>
+          <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-4 tracking-tight">
+            Ready to find your next opportunity?
+          </h2>
+          <p className="text-white/80 text-lg mb-10 max-w-xl mx-auto">
+            Join thousands of job seekers and top employers on JobNearby.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button onClick={() => navigate("/explore")} size="lg"
+              className="bg-white text-primary hover:bg-white/90 font-bold px-10 rounded-full shadow-lg">
+              Find Jobs
+            </Button>
+            <Button onClick={() => navigate("/auth")} size="lg" variant="outline"
+              className="border-white/50 text-white hover:bg-white/10 font-bold px-10 rounded-full">
+              Post a Job
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Footer ─────────────────────────────────────────────────── */
+function Footer() {
+  return (
+    <footer className="bg-white border-t py-12 relative z-10">
+      <div className="container mx-auto px-4">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-primary" />
+            <span className="font-bold text-lg tracking-tight">JobNearby</span>
+          </div>
+          <div className="flex items-center gap-6 text-sm text-muted-foreground font-medium">
+            <Link href="/about" className="hover:text-primary transition-colors">About</Link>
+            <Link href="/privacy" className="hover:text-primary transition-colors">Privacy</Link>
+            <Link href="/contact" className="hover:text-primary transition-colors">Contact</Link>
+          </div>
+          <div className="flex items-center gap-4 text-muted-foreground">
+            <a href="#" className="hover:text-primary transition-colors"><Linkedin className="w-5 h-5" /></a>
+            <a href="#" className="hover:text-primary transition-colors"><Twitter className="w-5 h-5" /></a>
+            <a href="#" className="hover:text-primary transition-colors"><Github className="w-5 h-5" /></a>
+          </div>
+        </div>
+        <div className="text-center text-sm text-muted-foreground mt-8">
+          &copy; {new Date().getFullYear()} JobNearby. All rights reserved.
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+/* ─── Search bar (shared) ────────────────────────────────────── */
+function SearchBar({ onSubmit }: { onSubmit: (job: string, location: string) => void }) {
+  const [jobQ, setJobQ] = useState("");
+  const [locQ, setLocQ] = useState("");
+  return (
+    <form onSubmit={e => { e.preventDefault(); onSubmit(jobQ, locQ); }}
+      className="max-w-3xl mx-auto bg-white/85 backdrop-blur-md border border-white/60 shadow-xl rounded-2xl overflow-hidden hover:shadow-2xl hover:bg-white/95 transition-all">
+      <div className="flex items-stretch">
+        <div className="flex items-center gap-3 flex-1 px-5 py-4 min-w-0">
+          <Briefcase className="w-5 h-5 text-primary flex-shrink-0" />
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-0.5">What</span>
+            <input type="text" value={jobQ} onChange={e => setJobQ(e.target.value)}
+              placeholder="Job title, keywords, or company"
+              className="bg-transparent border-none outline-none text-sm font-medium text-foreground placeholder:text-muted-foreground/50 w-full" />
+          </div>
+        </div>
+        <div className="w-px bg-border/50 my-3 flex-shrink-0" />
+        <div className="flex items-center gap-3 flex-1 px-5 py-4 min-w-0">
+          <MapPin className="w-5 h-5 text-primary flex-shrink-0" />
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-0.5">Where</span>
+            <input type="text" value={locQ} onChange={e => setLocQ(e.target.value)}
+              placeholder="City, state, or zip code"
+              className="bg-transparent border-none outline-none text-sm font-medium text-foreground placeholder:text-muted-foreground/50 w-full" />
+          </div>
+        </div>
+        <div className="flex items-center pr-3 pl-2 flex-shrink-0">
+          <Button type="submit" className="h-11 px-7 rounded-xl text-sm font-semibold gap-2">
+            <Search className="w-4 h-4" /> Explore Map
+          </Button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
+/* ─── Authenticated seeker home ──────────────────────────────── */
+function AuthenticatedSeekerHome({ user, navigate }: { user: AuthUser; navigate: (p: string) => void }) {
+  const [lang, setLang] = useState("EN");
   const [radius, setRadius] = useState([25]);
-  const [seekerRadius, setSeekerRadius] = useState([10]);
-  const [language, setLanguage] = useState("EN");
-  const [jobType, setJobType] = useState("");
-  const { scrollY } = useScroll();
+  const [categories, setCategories] = useState<CategoryLegendItem[]>([]);
+  const [browseJobs, setBrowseJobs] = useState<ApiJob[]>([]);
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const [browseSearch, setBrowseSearch] = useState("");
 
+  useEffect(() => {
+    setBrowseLoading(true);
+    jobsApi.list().then(res => setBrowseJobs(res.jobs ?? [])).catch(() => {}).finally(() => setBrowseLoading(false));
+  }, []);
 
-  // Hero: long gradual fade — starts immediately, fully gone at 520px
-  const heroOpacity = useTransform(scrollY, [0, 520], [1, 0]);
-  const heroScale   = useTransform(scrollY, [0, 520], [1, 0.88]);
-  const heroY       = useTransform(scrollY, [0, 520], [0, -80]);
+  const handleSearch = (jobQ: string, locQ: string) => {
+    const p = new URLSearchParams();
+    if (jobQ) p.set("q", jobQ);
+    if (locQ) p.set("location", locQ);
+    navigate(`/explore?${p.toString()}`);
+  };
 
-  // Navbar: purely scroll-driven, no React re-renders
-  // Starts appearing at 300px (hero is ~58% faded), fully visible at 480px
-  const navbarY       = useTransform(scrollY, [300, 480], [-72, 0]);
-  const navbarOpacity = useTransform(scrollY, [300, 480], [0, 1]);
+  const filtered = browseJobs.filter(j => {
+    const q = browseSearch.toLowerCase();
+    return !browseSearch || j.title.toLowerCase().includes(q) || j.company.toLowerCase().includes(q);
+  });
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
 
-      {/* ── Sticky Navbar — scroll-driven, no React re-renders ── */}
-      <motion.header
-        style={{ y: navbarY, opacity: navbarOpacity }}
-        className="fixed top-0 left-0 right-0 z-50 w-full backdrop-blur-md bg-white/80 border-b border-white/40"
-      >
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          {/* Left: Logo */}
+      {/* Navbar */}
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-border/40 shadow-sm">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
+          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+            <MapPin className="w-6 h-6 text-primary" />
+            <span className="font-extrabold text-xl tracking-tight">JobNearby</span>
+          </Link>
+          <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
+            {SEEKER_NAV.map(({ label, href }) => (
+              <Link key={label} href={href} className="text-muted-foreground hover:text-foreground transition-colors">{label}</Link>
+            ))}
+          </nav>
           <div className="flex items-center gap-2">
-            <div className="relative flex items-center justify-center text-primary">
-              <MapPin className="w-6 h-6 absolute" />
-              <Briefcase className="w-3 h-3 z-10 text-foreground" />
+            <GlobeMenu lang={lang} setLang={setLang} />
+            <NotificationBell />
+            <ProfileMenu user={user} navigate={navigate} />
+          </div>
+        </div>
+      </header>
+
+      {/* Map section */}
+      <section className="relative w-full h-screen min-h-[600px] flex flex-col overflow-hidden">
+        <Suspense fallback={<div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-slate-200" />}>
+          <JobMap radius={radius[0]} onCategoriesChange={setCategories} />
+        </Suspense>
+        <div className="absolute inset-0 z-[1] pointer-events-none"
+          style={{ background: "linear-gradient(to bottom, rgba(248,250,252,0.72) 0%, rgba(248,250,252,0.45) 40%, rgba(248,250,252,0.15) 70%, transparent 100%)" }} />
+        <div className="container mx-auto px-4 z-10 relative pt-10">
+          <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="max-w-2xl mx-auto text-center mb-6">
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2">
+              Welcome back, {user.fullName.split(" ")[0]}! 👋
+            </h2>
+            <p className="text-muted-foreground">Find your next opportunity on the map.</p>
+          </motion.div>
+          <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.15 }} className="mb-8">
+            <SearchBar onSubmit={handleSearch} />
+          </motion.div>
+        </div>
+        <div className="absolute bottom-8 left-0 right-0 px-4 md:px-8 z-10 flex flex-col md:flex-row justify-between items-end gap-4 pointer-events-none">
+          <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.8 }}
+            className="bg-white/70 backdrop-blur-sm border border-white/50 p-4 rounded-2xl shadow-lg pointer-events-auto w-full md:w-auto">
+            <h3 className="font-semibold mb-3 text-sm">Job Categories</h3>
+            {categories.length === 0
+              ? <p className="text-xs text-muted-foreground">No jobs in this area yet</p>
+              : <div className="space-y-2 text-sm">{categories.map(cat => (
+                  <div key={cat.name} className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
+                    <span>{cat.name}</span>
+                  </div>
+                ))}</div>}
+          </motion.div>
+          <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.9 }}
+            className="bg-white/70 backdrop-blur-sm border border-white/50 p-6 rounded-2xl shadow-lg pointer-events-auto w-full md:w-[320px]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-sm flex items-center gap-2"><Filter className="w-4 h-4" /> Search Radius</h3>
+              <span className="text-primary font-bold">{radius[0]} km</span>
             </div>
-            <span className="font-extrabold text-xl tracking-tight text-foreground">
-              JobNearby
-            </span>
-          </div>
+            <Slider defaultValue={[25]} max={50} min={5} step={5} value={radius} onValueChange={setRadius} className="mb-6" />
+            <div className="flex justify-between text-xs text-muted-foreground"><span>5km</span><span>25km</span><span>50km</span></div>
+          </motion.div>
+        </div>
+      </section>
 
-          {/* Center: name */}
-          <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 font-bold text-lg tracking-tight">
-            JobNearby
+      {/* Browse Jobs section */}
+      <section className="py-16 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+            <div>
+              <h2 className="text-2xl font-extrabold tracking-tight">Browse Jobs</h2>
+              <p className="text-muted-foreground text-sm mt-1">All available listings</p>
+            </div>
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input value={browseSearch} onChange={e => setBrowseSearch(e.target.value)}
+                placeholder="Search jobs…"
+                className="pl-9 h-9 w-56 rounded-full bg-secondary border-0 shadow-none text-sm" />
+              {browseSearch && (
+                <button onClick={() => setBrowseSearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
           </div>
+          {browseLoading ? (
+            <div className="py-16 text-center text-muted-foreground">
+              <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin opacity-30" />
+              <p className="text-sm">Loading jobs…</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-16 text-center text-muted-foreground">
+              <Briefcase className="w-10 h-10 mx-auto mb-3 opacity-20" />
+              <p className="font-medium">{browseSearch ? "No jobs match your search" : "No jobs available yet"}</p>
+              <p className="text-sm mt-1 opacity-70">Recruiters will post jobs here.</p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filtered.map((job, i) => (
+                <motion.div key={job._id} initial={{ y: 20, opacity: 0 }} whileInView={{ y: 0, opacity: 1 }}
+                  viewport={{ once: true }} transition={{ delay: i * 0.04 }}
+                  className="bg-white/70 backdrop-blur-sm border border-white/60 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer group">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
+                      {job.company.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm text-foreground group-hover:text-primary transition-colors truncate">{job.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{job.company}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3 flex-wrap">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary text-muted-foreground">{job.type}</span>
+                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><MapPin className="w-2.5 h-2.5" />{job.location}</span>
+                    {job.salary && <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><DollarSign className="w-2.5 h-2.5" />{job.salary}</span>}
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {job.skills?.slice(0, 3).map(s => (
+                      <span key={s} className="px-1.5 py-0.5 bg-secondary rounded text-[10px] text-muted-foreground">{s}</span>
+                    ))}
+                  </div>
+                  <Button size="sm" className="w-full h-8 text-xs font-semibold mt-4">Apply Now</Button>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
 
-          {/* Right: language + actions */}
-          <div className="flex items-center gap-4">
-            <Select value={language} onValueChange={setLanguage}>
-              <SelectTrigger
-                className="w-[80px] bg-transparent border-none shadow-none font-medium focus:ring-0"
-                data-testid="select-language"
-              >
-                <SelectValue placeholder="Lang" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="EN">EN</SelectItem>
-                <SelectItem value="FR">FR</SelectItem>
-                <SelectItem value="ES">ES</SelectItem>
-                <SelectItem value="DE">DE</SelectItem>
-                <SelectItem value="AR">AR</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" className="hidden sm:inline-flex" data-testid="btn-signin" onClick={() => navigate("/auth")}>
-              Sign In
-            </Button>
-            <Button data-testid="btn-getstarted" onClick={() => navigate("/auth")}>Get Started</Button>
+      <Footer />
+    </div>
+  );
+}
+
+/* ─── Marketing home (before login) ─────────────────────────── */
+function MarketingHome({ navigate }: { navigate: (p: string) => void }) {
+  const [lang, setLang] = useState("EN");
+  const [radius, setRadius] = useState([25]);
+  const [categories, setCategories] = useState<CategoryLegendItem[]>([]);
+  const { scrollY } = useScroll();
+  const heroOpacity = useTransform(scrollY, [0, 520], [1, 0]);
+  const heroScale = useTransform(scrollY, [0, 520], [1, 0.88]);
+  const heroY = useTransform(scrollY, [0, 520], [0, -80]);
+  const navbarY = useTransform(scrollY, [300, 480], [-72, 0]);
+  const navbarOpacity = useTransform(scrollY, [300, 480], [0, 1]);
+
+  const handleSearch = (jobQ: string, locQ: string) => {
+    const p = new URLSearchParams();
+    if (jobQ) p.set("q", jobQ);
+    if (locQ) p.set("location", locQ);
+    navigate(`/explore?${p.toString()}`);
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
+
+      {/* Scroll-driven navbar */}
+      <motion.header style={{ y: navbarY, opacity: navbarOpacity }}
+        className="fixed top-0 left-0 right-0 z-50 w-full backdrop-blur-md bg-white/80 border-b border-white/40">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-6 h-6 text-primary" />
+            <span className="font-extrabold text-xl tracking-tight">JobNearby</span>
+          </div>
+          <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
+            {PUBLIC_NAV.map(({ label, href }) => (
+              <Link key={label} href={href} className="text-muted-foreground hover:text-foreground transition-colors">{label}</Link>
+            ))}
+          </nav>
+          <div className="flex items-center gap-3">
+            <GlobeMenu lang={lang} setLang={setLang} />
+            <Button variant="outline" className="hidden sm:inline-flex rounded-full" onClick={() => navigate("/auth")}>Sign In</Button>
+            <Button className="rounded-full" onClick={() => navigate("/auth")}>Get Started</Button>
           </div>
         </div>
       </motion.header>
 
-      {/* ── Full-screen Hero — visible at top, fades/scales out on scroll ── */}
-      <motion.section
-        style={{ opacity: heroOpacity, scale: heroScale, y: heroY }}
-        className="fixed inset-0 z-40 flex flex-col items-center justify-center pointer-events-none select-none"
-        aria-hidden="true"
-      >
-        {/* Dot-grid background */}
+      {/* Fixed hero */}
+      <motion.section style={{ opacity: heroOpacity, scale: heroScale, y: heroY }}
+        className="fixed inset-0 z-40 flex flex-col items-center justify-center pointer-events-none select-none" aria-hidden="true">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_60%_40%,_#fef9c3_0%,_#f8fafc_60%)]" />
-        <div
-          className="absolute inset-0 opacity-40"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
-            backgroundSize: "28px 28px",
-          }}
-        />
-
-        {/* Animated glow blob */}
-        <motion.div
-          animate={{ scale: [1, 1.08, 1], opacity: [0.25, 0.4, 0.25] }}
-          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute w-[520px] h-[520px] rounded-full bg-primary/30 blur-[100px]"
-        />
-
-        {/* Name */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: "easeOut" }}
-          className="relative z-10 text-center px-6"
-        >
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <div className="relative flex items-center justify-center text-primary">
-              <MapPin className="w-10 h-10" strokeWidth={2.5} />
-            </div>
+        <div className="absolute inset-0 opacity-40" style={{ backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+        <motion.div animate={{ scale: [1, 1.08, 1], opacity: [0.25, 0.4, 0.25] }} transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute w-[520px] h-[520px] rounded-full bg-primary/30 blur-[100px]" />
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: "easeOut" }}
+          className="relative z-10 text-center px-6">
+          <div className="flex items-center justify-center mb-6">
+            <MapPin className="w-10 h-10 text-primary" strokeWidth={2.5} />
           </div>
-
           <h1 className="text-7xl sm:text-8xl md:text-9xl font-extrabold tracking-tighter leading-none text-foreground">
             Job<span className="text-primary">Nearby</span>
           </h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35, duration: 0.6 }}
-            className="mt-6 text-lg md:text-xl text-muted-foreground font-medium max-w-md mx-auto"
-          >
+          <motion.p initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35, duration: 0.6 }}
+            className="mt-6 text-lg md:text-xl text-muted-foreground font-medium max-w-md mx-auto">
             Connecting talent with opportunity — right in your neighbourhood.
           </motion.p>
         </motion.div>
-
-        {/* Scroll cue */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2 }}
-          className="absolute bottom-12 flex flex-col items-center gap-2 text-muted-foreground"
-        >
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2 }}
+          className="absolute bottom-12 flex flex-col items-center gap-2 text-muted-foreground">
           <span className="text-xs font-medium tracking-widest uppercase">Scroll to explore</span>
-          <motion.div
-            animate={{ y: [0, 6, 0] }}
-            transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-          >
+          <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}>
             <ChevronDown className="w-5 h-5" />
           </motion.div>
         </motion.div>
       </motion.section>
 
-      {/* ── Spacer so content starts below the hero ── */}
       <div className="h-screen" aria-hidden />
 
       <main className="flex-1 relative z-10 bg-background">
-        {/* Section 1: Map Explorer */}
+
+        {/* Map + search section */}
         <section className="relative w-full h-screen min-h-[600px] flex flex-col overflow-hidden">
-          {/* Real Map Background */}
           <Suspense fallback={<div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-slate-200" />}>
-            <JobMap radius={radius[0]} />
+            <JobMap radius={radius[0]} onCategoriesChange={setCategories} />
           </Suspense>
-
-          {/* Gradient overlay so text stays readable */}
           <div className="absolute inset-0 z-[1] pointer-events-none"
-            style={{
-              background: "linear-gradient(to bottom, rgba(248,250,252,0.72) 0%, rgba(248,250,252,0.45) 40%, rgba(248,250,252,0.15) 70%, transparent 100%)",
-            }}
-          />
-
+            style={{ background: "linear-gradient(to bottom, rgba(248,250,252,0.72) 0%, rgba(248,250,252,0.45) 40%, rgba(248,250,252,0.15) 70%, transparent 100%)" }} />
           <div className="container mx-auto px-4 z-10 relative pt-16">
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              whileInView={{ y: 0, opacity: 1 }}
-              viewport={{ once: true }}
-              className="max-w-2xl mx-auto text-center mb-8"
-            >
-              <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4">
-                Find Jobs Near You
-              </h2>
-              <p className="text-muted-foreground text-lg">
-                Connect with local opportunities within your preferred radius.
-              </p>
+            <motion.div initial={{ y: 20, opacity: 0 }} whileInView={{ y: 0, opacity: 1 }} viewport={{ once: true }}
+              className="max-w-2xl mx-auto text-center mb-8">
+              <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4">Find Jobs Near You</h2>
+              <p className="text-muted-foreground text-lg">Connect with local opportunities within your preferred radius.</p>
             </motion.div>
-
-            {/* Search Bar — clicking navigates to full Map Explorer */}
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              whileInView={{ y: 0, opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              onClick={() => navigate("/explore")}
-              className="max-w-3xl mx-auto bg-white/70 backdrop-blur-md border border-white/50 shadow-xl rounded-full p-2 flex items-center gap-2 mb-12 cursor-pointer hover:shadow-2xl hover:bg-white/90 transition-all group"
-            >
-              <div className="pl-4 text-muted-foreground">
-                <Search className="w-5 h-5" />
-              </div>
-              <span className="flex-1 text-base text-muted-foreground pl-1 select-none">
-                Search jobs, skills, companies near you…
-              </span>
-              <Button className="rounded-full px-8 gap-2 group-hover:gap-3 transition-all" data-testid="btn-map-search">
-                Explore Map <ExternalLink className="w-3.5 h-3.5" />
-              </Button>
+            <motion.div initial={{ y: 20, opacity: 0 }} whileInView={{ y: 0, opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.2 }} className="mb-12">
+              <SearchBar onSubmit={handleSearch} />
             </motion.div>
           </div>
-
-          {/* Map Controls */}
           <div className="absolute bottom-8 left-0 right-0 px-4 md:px-8 z-10 flex flex-col md:flex-row justify-between items-end gap-4 pointer-events-none">
-            {/* Legend Card */}
-            <motion.div
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.8 }}
-              className="bg-white/70 backdrop-blur-sm border border-white/50 p-4 rounded-2xl shadow-lg pointer-events-auto w-full md:w-auto"
-            >
+            <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.8 }}
+              className="bg-white/70 backdrop-blur-sm border border-white/50 p-4 rounded-2xl shadow-lg pointer-events-auto w-full md:w-auto">
               <h3 className="font-semibold mb-3 text-sm">Job Categories</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-primary" />
-                  <span>Tech &amp; Engineering</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-blue-500" />
-                  <span>Sales &amp; Marketing</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-green-500" />
-                  <span>Healthcare</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-purple-500" />
-                  <span>Design &amp; Creative</span>
-                </div>
-              </div>
+              {categories.length === 0
+                ? <p className="text-xs text-muted-foreground">No jobs in this area yet</p>
+                : <div className="space-y-2 text-sm">{categories.map(cat => (
+                    <div key={cat.name} className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
+                      <span>{cat.name}</span>
+                    </div>
+                  ))}</div>}
             </motion.div>
-
-            {/* Radius Selector Card */}
-            <motion.div
-              initial={{ x: 20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.9 }}
-              className="bg-white/70 backdrop-blur-sm border border-white/50 p-6 rounded-2xl shadow-lg pointer-events-auto w-full md:w-[320px]"
-            >
+            <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.9 }}
+              className="bg-white/70 backdrop-blur-sm border border-white/50 p-6 rounded-2xl shadow-lg pointer-events-auto w-full md:w-[320px]">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-sm flex items-center gap-2">
-                  <Filter className="w-4 h-4" />
-                  Search Radius
-                </h3>
+                <h3 className="font-semibold text-sm flex items-center gap-2"><Filter className="w-4 h-4" /> Search Radius</h3>
                 <span className="text-primary font-bold">{radius[0]} km</span>
               </div>
-              <Slider
-                defaultValue={[25]}
-                max={50}
-                min={5}
-                step={5}
-                value={radius}
-                onValueChange={setRadius}
-                className="mb-6"
-                data-testid="slider-map-radius"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>5km</span>
-                <span>25km</span>
-                <span>50km</span>
-              </div>
+              <Slider defaultValue={[25]} max={50} min={5} step={5} value={radius} onValueChange={setRadius} className="mb-6" data-testid="slider-map-radius" />
+              <div className="flex justify-between text-xs text-muted-foreground"><span>5km</span><span>25km</span><span>50km</span></div>
             </motion.div>
           </div>
         </section>
 
-        {/* Section 2: Profile Edit Panel */}
-        <section className="py-24 bg-background relative">
-          <div className="absolute inset-0 bg-primary/5 -skew-y-3 transform origin-top-left z-0" />
-
-          <div className="container mx-auto px-4 z-10 relative">
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              whileInView={{ y: 0, opacity: 1 }}
-              viewport={{ once: true }}
-              className="text-center mb-16"
-            >
-              <h2 className="text-3xl font-extrabold tracking-tight mb-4">
-                Join the Network
-              </h2>
-              <p className="text-muted-foreground max-w-2xl mx-auto">
-                Whether you're looking for your next career move or searching for the perfect local candidate, JobNearby makes it seamless.
-              </p>
-            </motion.div>
-
-            <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-              {/* Job Seeker Card */}
-              <motion.div
-                initial={{ y: 40, opacity: 0 }}
-                whileInView={{ y: 0, opacity: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.1 }}
-                className="bg-white/70 backdrop-blur-sm border border-white/50 shadow-xl rounded-3xl p-8"
-              >
-                <h3 className="text-2xl font-bold mb-6 text-center">Your Profile</h3>
-
-                <div className="flex justify-center mb-8">
-                  <Avatar className="w-24 h-24 border-4 border-white shadow-md bg-gradient-to-br from-primary to-orange-300">
-                    <AvatarFallback className="text-2xl font-bold bg-transparent text-primary-foreground">JN</AvatarFallback>
-                  </Avatar>
-                </div>
-
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Full Name</label>
-                    <Input placeholder="Jane Doe" data-testid="input-seeker-name" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Role Seeking</label>
-                    <Input placeholder="Senior Frontend Developer" data-testid="input-seeker-role" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Skills</label>
-                    <div className="flex flex-wrap gap-2 p-3 border rounded-md bg-white/50">
-                      <span className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-md">React</span>
-                      <span className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-md">TypeScript</span>
-                      <span className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded-md">Node.js</span>
-                      <Input placeholder="Add skill..." className="border-0 h-6 p-0 w-24 bg-transparent focus-visible:ring-0 shadow-none text-xs" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Location</label>
-                    <Input placeholder="San Francisco, CA" data-testid="input-seeker-location" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Bio</label>
-                    <Textarea placeholder="Tell recruiters about your experience..." className="resize-none" data-testid="input-seeker-bio" />
-                  </div>
-
-                  <div className="space-y-4 pt-2">
-                    <div className="flex justify-between text-sm">
-                      <label className="font-medium">Preferred Commute Radius</label>
-                      <span className="font-bold text-primary">{seekerRadius[0]} km</span>
-                    </div>
-                    <Slider
-                      max={100}
-                      min={5}
-                      step={1}
-                      value={seekerRadius}
-                      onValueChange={setSeekerRadius}
-                      data-testid="slider-seeker-radius"
-                    />
-                  </div>
-
-                  <div className="pt-4 space-y-3">
-                    <Button variant="outline" className="w-full bg-white/50" data-testid="btn-seeker-resume">
-                      Upload Resume
-                    </Button>
-                    <Button className="w-full text-primary-foreground font-semibold" data-testid="btn-seeker-save">
-                      Save Profile
-                    </Button>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Recruiter Card */}
-              <motion.div
-                initial={{ y: 40, opacity: 0 }}
-                whileInView={{ y: 0, opacity: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.2 }}
-                className="bg-white/70 backdrop-blur-sm border border-white/50 shadow-xl rounded-3xl p-8"
-              >
-                <h3 className="text-2xl font-bold mb-6 text-center">Post a Job</h3>
-
-                <div className="flex justify-center mb-8">
-                  <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-muted-foreground/30 flex items-center justify-center bg-white/50 text-muted-foreground flex-col gap-1 cursor-pointer hover:bg-white transition-colors">
-                    <Briefcase className="w-6 h-6" />
-                    <span className="text-xs font-medium">Add Logo</span>
-                  </div>
-                </div>
-
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Company Name</label>
-                    <Input placeholder="Acme Corp" data-testid="input-job-company" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Job Title</label>
-                    <Input placeholder="Product Designer" data-testid="input-job-title" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Job Type</label>
-                    <Select value={jobType} onValueChange={setJobType}>
-                      <SelectTrigger className="bg-white/50" data-testid="select-job-type">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="full-time">Full-time</SelectItem>
-                        <SelectItem value="part-time">Part-time</SelectItem>
-                        <SelectItem value="contract">Contract</SelectItem>
-                        <SelectItem value="freelance">Freelance</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Office Location</label>
-                    <Input placeholder="123 Market St, City" data-testid="input-job-location" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Salary Range</label>
-                    <Input placeholder="$80,000 - $120,000" data-testid="input-job-salary" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Required Skills</label>
-                    <div className="flex flex-wrap gap-2 p-3 border rounded-md bg-white/50">
-                      <span className="px-2 py-1 bg-primary/10 text-primary-foreground text-xs rounded-md">Figma</span>
-                      <span className="px-2 py-1 bg-primary/10 text-primary-foreground text-xs rounded-md">UX Research</span>
-                      <Input placeholder="Add skill..." className="border-0 h-6 p-0 w-24 bg-transparent focus-visible:ring-0 shadow-none text-xs" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Job Description</label>
-                    <Textarea placeholder="Describe the role and responsibilities..." className="resize-none h-24" data-testid="input-job-desc" />
-                  </div>
-
-                  <div className="pt-4">
-                    <Button className="w-full text-primary-foreground font-semibold" data-testid="btn-job-publish">
-                      Publish Job Listing
-                    </Button>
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-          </div>
-        </section>
+        <StatsSection />
+        <WhyChooseSection />
+        <HowItWorksSection />
+        <CTASection navigate={navigate} />
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t py-12 relative z-10">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-primary" />
-              <span className="font-bold text-lg tracking-tight">JobNearby</span>
-            </div>
-
-            <div className="flex items-center gap-6 text-sm text-muted-foreground font-medium">
-              <Link href="/about" className="hover:text-primary transition-colors">About</Link>
-              <Link href="/privacy" className="hover:text-primary transition-colors">Privacy</Link>
-              <Link href="/contact" className="hover:text-primary transition-colors">Contact</Link>
-            </div>
-
-            <div className="flex items-center gap-4 text-muted-foreground">
-              <a href="#" className="hover:text-primary transition-colors" data-testid="link-linkedin"><Linkedin className="w-5 h-5" /></a>
-              <a href="#" className="hover:text-primary transition-colors" data-testid="link-twitter"><Twitter className="w-5 h-5" /></a>
-              <a href="#" className="hover:text-primary transition-colors" data-testid="link-github"><Github className="w-5 h-5" /></a>
-            </div>
-          </div>
-
-          <div className="text-center text-sm text-muted-foreground mt-8">
-            &copy; {new Date().getFullYear()} JobNearby. All rights reserved.
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
+}
+
+/* ─── Main export ────────────────────────────────────────────── */
+export default function Home() {
+  const [, navigate] = useLocation();
+  const user = getUser();
+
+  useEffect(() => {
+    if (user?.role === "recruiter") navigate("/dashboard/recruiter");
+  }, []);
+
+  if (user?.role === "seeker") return <AuthenticatedSeekerHome user={user} navigate={navigate} />;
+  return <MarketingHome navigate={navigate} />;
 }

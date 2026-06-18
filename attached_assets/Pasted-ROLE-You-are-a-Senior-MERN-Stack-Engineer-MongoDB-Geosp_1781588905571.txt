@@ -1,0 +1,467 @@
+ROLE:
+You are a Senior MERN Stack Engineer, MongoDB Geospatial Expert, and Map Integration Specialist.
+
+OBJECTIVE:
+Upgrade the existing JobNearby application so that Job Categories, Search Radius, Job Markers, and Map behavior are fully dynamic using MongoDB geospatial queries without changing any existing UI design, layout, colors, spacing, styling, responsiveness, or user experience.
+
+CURRENT REQUIREMENTS:
+
+1. Dynamic Radius-Based Job Fetching
+
+* Use the user's current location as the center point.
+* When the radius slider changes:
+
+  * Automatically fetch jobs from MongoDB within the selected radius.
+  * Update results instantly.
+  * No page refresh.
+  * No manual refresh.
+
+Supported radius values:
+
+* 5 km
+* 10 km
+* 25 km
+* 50 km
+* 100 km
+
+Requirements:
+
+* Radius changes must trigger a new API request.
+* Only jobs inside the selected radius should be returned.
+* Results must update in real time.
+
+---
+
+2. MongoDB Geospatial Search
+
+Store job locations in GeoJSON format:
+
+{
+location: {
+type: "Point",
+coordinates: [longitude, latitude]
+}
+}
+
+Create a MongoDB 2dsphere index:
+
+jobSchema.index({
+location: "2dsphere"
+});
+
+Use MongoDB geospatial queries.
+
+Example:
+
+Job.find({
+location: {
+$near: {
+$geometry: {
+type: "Point",
+coordinates: [lng, lat]
+},
+$maxDistance: radiusInMeters
+}
+}
+});
+
+Requirements:
+
+* Query only jobs inside selected radius.
+* Never fetch all jobs and filter on frontend.
+* All filtering must happen inside MongoDB.
+
+---
+
+3. Dynamic Job Categories (Fully Database Driven)
+
+REMOVE all hardcoded categories.
+
+Do NOT assume categories such as:
+
+* Tech & Engineering
+* Sales & Marketing
+* Healthcare
+* Design & Creative
+
+The Category Sidebar must be generated dynamically from jobs returned by MongoDB within the selected radius.
+
+Requirements:
+
+* Extract categories from actual jobs returned by MongoDB.
+* Categories must come directly from database values.
+* Show only categories that have jobs within the selected radius.
+* Support unlimited categories.
+* No hardcoded category list in frontend.
+* No hardcoded category list in backend.
+
+Counts must update automatically whenever:
+
+* Radius changes
+* User location changes
+* New jobs are added
+* Existing jobs are updated
+* Jobs are deleted
+
+Example:
+
+Jobs found:
+
+Software Development
+Software Development
+Finance
+Finance
+Finance
+Logistics
+
+Display:
+
+Software Development (2)
+Finance (3)
+Logistics (1)
+
+If no jobs exist:
+
+Show:
+
+No Jobs Found Nearby
+
+0 Jobs Found
+
+Do NOT display:
+
+Software Development (0)
+Finance (0)
+Logistics (0)
+
+---
+
+4. Dynamic Category Colors
+
+Support unlimited categories.
+
+Requirements:
+
+* Generate category colors dynamically.
+* Same category should always receive the same color.
+* New categories should automatically receive a color.
+* No frontend code changes required for new categories.
+
+Example:
+
+Software Development → Yellow
+Finance → Green
+Logistics → Blue
+Construction → Purple
+Driver Jobs → Orange
+
+---
+
+5. Dynamic Map Zoom
+
+Map must automatically zoom according to selected radius.
+
+Example:
+
+5 km → Zoom 13
+10 km → Zoom 12
+25 km → Zoom 11
+50 km → Zoom 10
+100 km → Zoom 9
+
+Requirements:
+
+* Smooth animation.
+* No map reload.
+* Center remains user location.
+
+Example:
+
+map.flyTo({
+center: [lng, lat],
+zoom: calculatedZoom,
+duration: 1000
+})
+
+---
+
+6. Radius Circle Visualization
+
+Display a dashed radius circle around the user's location.
+
+Requirements:
+
+* Center = user location.
+* Radius = slider value.
+* Updates live when radius changes.
+* Smooth animation.
+
+Visual Requirements:
+
+* Dashed border.
+* Semi-transparent fill.
+* Border color should match current theme.
+* Circle automatically resizes.
+
+Example:
+
+5 km radius → small circle
+100 km radius → large circle
+
+Implementation can use:
+
+* Mapbox source/layer
+* Leaflet circle
+* Turf.js generated polygon
+
+---
+
+7. Job Marker Filtering
+
+Only display markers for jobs inside the selected radius.
+
+Requirements:
+
+When radius changes:
+
+* Remove markers outside radius.
+* Add markers inside radius.
+* Re-render markers automatically.
+
+Map should always reflect current query results.
+
+---
+
+8. Empty State
+
+If no jobs exist inside selected radius:
+
+Show:
+
+"No jobs found within X km radius"
+
+Display:
+
+0 Jobs Found
+
+Hide:
+
+* Category list
+* Category counts
+* Job markers
+
+Keep visible:
+
+* User location marker
+* Radius circle
+* Current map position
+
+Do not display categories with zero counts.
+
+---
+
+9. Backend API
+
+Create or update endpoint:
+
+GET /api/jobs/nearby
+
+Query Parameters:
+
+latitude
+longitude
+radius
+
+Example:
+
+/api/jobs/nearby?latitude=18.9894&longitude=73.1175&radius=25000
+
+Response:
+
+{
+"totalJobs": 24,
+"categories": [
+{
+"name": "Software Development",
+"count": 12
+},
+{
+"name": "Finance",
+"count": 8
+},
+{
+"name": "Logistics",
+"count": 4
+}
+],
+"jobs": [...]
+}
+
+---
+
+10. MongoDB Aggregation
+
+Use MongoDB aggregation for performance.
+
+Example:
+
+[
+{
+$geoNear: {
+near: {
+type: "Point",
+coordinates: [longitude, latitude]
+},
+distanceField: "distance",
+maxDistance: radiusInMeters,
+spherical: true
+}
+},
+{
+$group: {
+_id: "$category",
+count: {
+$sum: 1
+}
+}
+}
+]
+
+Requirements:
+
+* Categories generated from aggregation.
+* Counts generated from aggregation.
+* Jobs returned from same radius query.
+
+---
+
+11. Performance Requirements
+
+Requirements:
+
+* Use MongoDB geospatial indexes.
+* Use aggregation pipeline.
+* Avoid full collection scans.
+* Avoid frontend filtering.
+* Query only nearby jobs.
+* Support 10,000+ jobs.
+* Response target under 500ms.
+
+---
+
+12. Real-Time Data Consistency
+
+Whenever a new job is created:
+
+* Job should immediately appear if inside radius.
+
+Whenever a job is updated:
+
+* Category counts must refresh.
+
+Whenever a job is deleted:
+
+* Category counts must refresh.
+
+Sidebar and markers must always reflect database state.
+
+---
+
+13. Design Protection (CRITICAL)
+
+DO NOT CHANGE:
+
+* Existing UI
+* Existing design
+* Existing layout
+* Existing typography
+* Existing spacing
+* Existing colors
+* Existing cards
+* Existing navbar
+* Existing buttons
+* Existing search bar
+* Existing responsiveness
+* Existing animations
+
+Only add functionality.
+
+No redesigns.
+
+---
+
+14. Files To Update
+
+Identify and update only relevant files:
+
+Backend:
+
+* Job Schema
+* Job Model
+* Nearby Jobs Controller
+* Nearby Jobs Route
+* MongoDB Aggregation Logic
+
+Frontend:
+
+* Radius Slider Component
+* Map Component
+* Category Sidebar
+* Marker Rendering Logic
+* API Service Layer
+* State Management
+
+---
+
+15. Output Format
+
+Provide:
+
+1. Current Issue Analysis
+2. Database Schema Changes
+3. MongoDB Index Setup
+4. Backend API Changes
+5. Aggregation Pipeline
+6. Dynamic Category Logic
+7. Dynamic Category Color Logic
+8. Radius Circle Implementation
+9. Dynamic Map Zoom Logic
+10. Marker Filtering Logic
+11. Frontend Component Updates
+12. Complete Production-Ready Code
+13. File-by-File Change List
+14. Testing Checklist
+
+---
+
+FINAL GOAL
+
+When a user selects a radius:
+
+✓ MongoDB returns only jobs inside radius
+
+✓ Category list is generated dynamically from database
+
+✓ Category counts update automatically
+
+✓ No hardcoded categories exist
+
+✓ New categories appear automatically
+
+✓ Map zoom changes automatically
+
+✓ Dashed radius circle appears
+
+✓ Circle size matches selected radius
+
+✓ Only nearby job markers are visible
+
+✓ Empty state works correctly
+
+✓ MongoDB geospatial queries are used
+
+✓ 2dsphere indexes are used
+
+✓ No design changes
+
+✓ Fully production-ready MERN implementation

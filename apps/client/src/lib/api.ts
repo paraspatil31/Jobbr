@@ -13,7 +13,8 @@ export interface AuthResponse {
 }
 
 export interface ApiError {
-  error: string;
+  error?: string;
+  message?: string;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -21,9 +22,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...init?.headers },
     ...init,
   });
-  const body = await res.json() as T | ApiError;
+  const text = await res.text();
+  let body: T | ApiError;
+  try {
+    body = text ? (JSON.parse(text) as T | ApiError) : ({} as T);
+  } catch {
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+    return {} as T;
+  }
   if (!res.ok) {
-    throw new Error((body as ApiError).error ?? `Request failed (${res.status})`);
+    const err = body as ApiError;
+    throw new Error(err.message ?? err.error ?? `Request failed (${res.status})`);
   }
   return body as T;
 }
@@ -57,6 +66,10 @@ export function saveSession(data: AuthResponse) {
 export function clearSession() {
   localStorage.removeItem("jn_token");
   localStorage.removeItem("jn_user");
+}
+
+export function getToken(): string | null {
+  return localStorage.getItem("jn_token");
 }
 
 export function getUser(): AuthUser | null {

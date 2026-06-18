@@ -18,6 +18,18 @@ function assertDB(next: NextFunction): boolean {
   return true;
 }
 
+async function geocodeLocation(location: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&limit=1`;
+    const res = await fetch(url, { headers: { "Accept-Language": "en" }, signal: AbortSignal.timeout(6000) });
+    const json = await res.json() as Array<{ lat: string; lon: string }>;
+    if (!json.length) return null;
+    return { lat: parseFloat(json[0]!.lat), lng: parseFloat(json[0]!.lon) };
+  } catch {
+    return null;
+  }
+}
+
 function signToken(userId: string, role: string, email: string): string {
   const secret = process.env["JWT_SECRET"];
   if (!secret) throw new AppError(500, "JWT_SECRET is not set");
@@ -80,6 +92,16 @@ export async function register(
         email: user.email,
       },
     });
+
+    // Background geocode — doesn't block response
+    geocodeLocation(location).then((coords) => {
+      if (coords) {
+        UserModel.updateOne(
+          { _id: user._id },
+          { geoLocation: { type: "Point", coordinates: [coords.lng, coords.lat] } }
+        ).catch(() => {});
+      }
+    }).catch(() => {});
   } catch (err) {
     next(err);
   }

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   listJobs,
+  nearbyJobs,
   getJob,
   createJob,
   updateJob,
@@ -10,6 +11,7 @@ import { requireAuth } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
+router.get("/jobs/nearby", nearbyJobs);
 router.get("/jobs", listJobs);
 router.get("/jobs/:id", getJob);
 router.post("/jobs", requireAuth, createJob);

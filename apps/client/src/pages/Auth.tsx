@@ -179,7 +179,7 @@ export default function Auth() {
 
   useEffect(() => {
     if (step === 3) {
-      const dest = role === "recruiter" ? "/dashboard/recruiter" : "/dashboard/seeker";
+      const dest = role === "recruiter" ? "/dashboard/recruiter" : "/";
       const t = setTimeout(() => navigate(dest), 2200);
       return () => clearTimeout(t);
     }

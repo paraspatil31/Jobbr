@@ -1,28 +1,32 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+
+export interface CategoryLegendItem {
+  name: string;
+  color: string;
+}
+
+function categoryColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) & 0x7fffffff;
+  }
+  return `hsl(${hash % 360}, 60%, 48%)`;
+}
 
 interface JobPin {
   id: string;
   title: string;
   company: string;
+  category: string;
   type: string;
   salary: string;
-  distance: string;
   lat: number;
   lng: number;
   color: string;
 }
-
-const MAP_JOBS: JobPin[] = [
-  { id: "1", title: "Frontend Developer",   company: "TechHub SF",   type: "Full-time", salary: "$90k–$120k",  distance: "1.2 mi", lat: 37.7749,  lng: -122.4194, color: "#3b82f6" },
-  { id: "2", title: "UX Designer",          company: "DesignCo",     type: "Contract",  salary: "$75k–$95k",   distance: "0.8 mi", lat: 37.7858,  lng: -122.4064, color: "#a855f7" },
-  { id: "3", title: "Product Manager",      company: "GrowthLabs",   type: "Full-time", salary: "$110k–$140k", distance: "3.4 mi", lat: 37.8044,  lng: -122.2712, color: "#22c55e" },
-  { id: "4", title: "Backend Engineer",     company: "DataStream",   type: "Part-time", salary: "$70k–$90k",   distance: "2.1 mi", lat: 37.7590,  lng: -122.4040, color: "#f97316" },
-  { id: "5", title: "Marketing Specialist", company: "BrandForward", type: "Full-time", salary: "$60k–$80k",   distance: "1.8 mi", lat: 37.7700,  lng: -122.4400, color: "#ec4899" },
-  { id: "6", title: "DevOps Engineer",      company: "CloudBase",    type: "Contract",  salary: "$100k–$130k", distance: "Remote", lat: 37.7825,  lng: -122.4100, color: "#06b6d4" },
-];
 
 function makeJobIcon(color: string) {
   return L.divIcon({
@@ -47,44 +51,82 @@ function makeUserIcon() {
     className: "",
     iconSize: [20, 20],
     iconAnchor: [10, 10],
-    html: `
-      <div style="width:20px;height:20px;position:relative">
-        <div style="width:20px;height:20px;border-radius:50%;background:#2563eb;border:3px solid white;box-shadow:0 2px 8px rgba(37,99,235,0.5);position:absolute;inset:0"></div>
-      </div>
-    `,
+    html: `<div style="width:20px;height:20px;border-radius:50%;background:#2563eb;border:3px solid white;box-shadow:0 2px 8px rgba(37,99,235,0.5)"></div>`,
   });
 }
 
 function RecenterMap({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap();
+  const first = useRef(true);
   useEffect(() => {
-    map.setView([lat, lng], map.getZoom(), { animate: true });
+    if (first.current) {
+      first.current = false;
+      map.setView([lat, lng], map.getZoom(), { animate: true });
+    }
   }, [lat, lng, map]);
   return null;
 }
 
 interface JobMapProps {
   radius?: number;
+  onCategoriesChange?: (cats: CategoryLegendItem[]) => void;
 }
 
-export default function JobMap({ radius = 25 }: JobMapProps) {
+export default function JobMap({ radius = 25, onCategoriesChange }: JobMapProps) {
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
-  const [locationGranted, setLocationGranted] = useState(false);
+  const [jobs, setJobs] = useState<JobPin[]>([]);
   const [center] = useState<[number, number]>([37.7749, -122.4194]);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocationGranted(true);
-      },
-      () => {
-        setLocationGranted(false);
-      },
+      (pos) => setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
       { timeout: 8000, maximumAge: 60000 }
     );
   }, []);
+
+  useEffect(() => {
+    const lat = userPos?.lat ?? 37.7749;
+    const lng = userPos?.lng ?? -122.4194;
+    const radiusM = radius * 1000;
+
+    fetch(`/api/jobs/nearby?latitude=${lat}&longitude=${lng}&radius=${radiusM}`)
+      .then((r) => r.json())
+      .then((data: { jobs?: Array<Record<string, unknown>>; categories?: Array<{ name: string; count: number }> }) => {
+        const pins: JobPin[] = (data.jobs ?? [])
+          .filter((j) => {
+            const geo = j["geoLocation"] as { coordinates?: [number, number] } | undefined;
+            return geo?.coordinates && geo.coordinates.length === 2;
+          })
+          .map((j) => {
+            const geo = j["geoLocation"] as { coordinates: [number, number] };
+            const cat = String(j["category"] ?? "General");
+            return {
+              id: String(j["_id"]),
+              title: String(j["title"] ?? ""),
+              company: String(j["company"] ?? ""),
+              category: cat,
+              type: String(j["type"] ?? ""),
+              salary: String(j["salary"] ?? ""),
+              lat: geo.coordinates[1],
+              lng: geo.coordinates[0],
+              color: categoryColor(cat),
+            };
+          });
+
+        setJobs(pins);
+
+        if (onCategoriesChange) {
+          const cats: CategoryLegendItem[] = (data.categories ?? []).map((c) => ({
+            name: c.name,
+            color: categoryColor(c.name),
+          }));
+          onCategoriesChange(cats);
+        }
+      })
+      .catch(() => {});
+  }, [userPos, radius]);
 
   const mapCenter: [number, number] = userPos ? [userPos.lat, userPos.lng] : center;
   const radiusMeters = radius * 1000;
@@ -102,7 +144,7 @@ export default function JobMap({ radius = 25 }: JobMapProps) {
     >
       <TileLayer
         url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
+        attribution='&copy; OSM &copy; CARTO'
       />
 
       {userPos && (
@@ -121,35 +163,35 @@ export default function JobMap({ radius = 25 }: JobMapProps) {
           />
           <Marker position={[userPos.lat, userPos.lng]} icon={makeUserIcon()}>
             <Popup>
-              <div className="text-sm font-semibold text-blue-600">📍 You are here</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#1e40af" }}>📍 You are here</div>
             </Popup>
           </Marker>
         </>
       )}
 
-      {MAP_JOBS.map((job) => (
-        <Marker key={job.id} position={[job.lat, job.lng]} icon={makeJobIcon(job.color)}>
-          <Popup>
-            <div style={{ minWidth: 160, fontFamily: "sans-serif" }}>
-              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2, color: "#0f172a" }}>{job.title}</div>
-              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>{job.company}</div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
-                <span style={{ fontSize: 11, background: "#f1f5f9", borderRadius: 4, padding: "2px 6px", color: "#475569" }}>{job.type}</span>
-                <span style={{ fontSize: 11, background: "#f1f5f9", borderRadius: 4, padding: "2px 6px", color: "#475569" }}>💰 {job.salary}</span>
-              </div>
-              <div style={{ fontSize: 11, color: "#94a3b8" }}>📍 {job.distance}</div>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-
-      {!locationGranted && (
+      {!userPos && (
         <Marker position={mapCenter} icon={makeUserIcon()}>
           <Popup>
             <div style={{ fontSize: 12, color: "#64748b" }}>Enable location to see nearby jobs</div>
           </Popup>
         </Marker>
       )}
+
+      {jobs.map((job) => (
+        <Marker key={job.id} position={[job.lat, job.lng]} icon={makeJobIcon(job.color)}>
+          <Popup>
+            <div style={{ minWidth: 160, fontFamily: "sans-serif" }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2, color: "#0f172a" }}>{job.title}</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>{job.company}</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, marginBottom: 4 }}>
+                <span style={{ fontSize: 11, background: "#f1f5f9", borderRadius: 4, padding: "2px 6px", color: "#475569" }}>{job.type}</span>
+                {job.salary && <span style={{ fontSize: 11, background: "#f1f5f9", borderRadius: 4, padding: "2px 6px", color: "#475569" }}>💰 {job.salary}</span>}
+              </div>
+              <div style={{ fontSize: 11, background: `${job.color}18`, color: job.color, borderRadius: 4, padding: "2px 6px", display: "inline-block" }}>{job.category}</div>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
     </MapContainer>
   );
 }

@@ -3,12 +3,17 @@ import mongoose, { type Document, type Model, type Types } from "mongoose";
 export interface IJob extends Document {
   title: string;
   company: string;
+  category: string;
   type: "full-time" | "part-time" | "contract" | "freelance";
   location: string;
   salary?: string;
   description: string;
   skills: string[];
   recruiter: Types.ObjectId;
+  geoLocation?: {
+    type: "Point";
+    coordinates: [number, number];
+  };
   latitude?: number;
   longitude?: number;
   radiusKm?: number;
@@ -21,6 +26,7 @@ const jobSchema = new mongoose.Schema<IJob>(
   {
     title: { type: String, required: true, trim: true },
     company: { type: String, required: true, trim: true },
+    category: { type: String, required: true, trim: true, default: "General" },
     type: {
       type: String,
       enum: ["full-time", "part-time", "contract", "freelance"],
@@ -35,6 +41,15 @@ const jobSchema = new mongoose.Schema<IJob>(
       ref: "User",
       required: true,
     },
+    geoLocation: {
+      type: {
+        type: String,
+        enum: ["Point"],
+      },
+      coordinates: {
+        type: [Number],
+      },
+    },
     latitude: { type: Number },
     longitude: { type: Number },
     radiusKm: { type: Number, default: 25 },
@@ -44,6 +59,7 @@ const jobSchema = new mongoose.Schema<IJob>(
 );
 
 jobSchema.index({ location: "text", title: "text" });
+jobSchema.index({ geoLocation: "2dsphere" });
 
 export const JobModel: Model<IJob> =
   mongoose.models["Job"] ?? mongoose.model<IJob>("Job", jobSchema);

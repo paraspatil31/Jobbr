@@ -1,0 +1,342 @@
+17. Navbar & Job Seeker Experience Improvements
+
+A. Language Selector
+
+CURRENT:
+
+* Language selector shows text such as "EN".
+
+REQUIRED:
+
+* Replace the language text selector with a Globe/World icon.
+* Clicking the globe icon opens a language dropdown.
+* Support future multi-language expansion.
+* Maintain current navbar design.
+* Do not change navbar spacing or styling.
+
+---
+
+B. Remove Post Job Button From Public Navbar
+
+CURRENT:
+
+* Navbar contains "Post Job".
+
+REQUIRED:
+
+* Remove "Post Job" from the public navbar completely.
+* Do not leave empty spacing.
+* Navbar alignment should remain clean.
+
+---
+
+C. Authentication-Based Navbar
+
+Before Login:
+
+Show:
+
+* Home
+* Browse Jobs
+* About
+* Globe Language Icon
+* Sign In
+* Get Started
+
+After Job Seeker Login:
+
+Hide:
+
+* Sign In
+* Get Started
+* About
+* Landing Page Marketing Sections
+
+Show:
+
+* Home
+* Browse Jobs
+* Globe Language Icon
+* Profile Dropdown
+
+---
+
+D. Profile Dropdown Menu
+
+Instead of displaying a simple profile icon, create a dropdown.
+
+When clicking profile:
+
+Show options already available in Job Seeker Dashboard:
+
+* My Profile
+* Applied Jobs
+* Saved Jobs
+* Notifications
+* Settings
+* Logout
+
+Requirements:
+
+* Reuse existing dashboard routes.
+* Do not create duplicate pages.
+* Dropdown must be responsive.
+* Close when user clicks outside.
+
+---
+
+E. Redirect After Login
+
+CURRENT ISSUE:
+User remains on login page or landing page after authentication.
+
+REQUIRED:
+
+After successful Job Seeker login:
+
+Automatically redirect to:
+
+/home
+
+or existing authenticated home route.
+
+Requirements:
+
+* No manual refresh.
+* Preserve authentication state.
+* Redirect immediately after successful login.
+
+---
+
+18. Homepage Content Expansion
+
+Add the following sections WITHOUT changing existing design language.
+
+Place sections below existing home map/job area.
+
+---
+
+A. Statistics Section 📊
+
+Add a statistics section containing:
+
+10,000+ Active Jobs
+
+2,500+ Employers
+
+50+ Cities
+
+100,000+ Applications
+
+Requirements:
+
+* Responsive cards.
+* Animated counters optional.
+* Match existing design system.
+
+---
+
+B. Why Choose JobNearby? 🎯
+
+Add 4 feature cards:
+
+📍 Location-Based Search
+
+Description:
+Find jobs near your current location.
+
+⚡ Quick Apply
+
+Description:
+Apply to jobs in seconds.
+
+🛡 Verified Companies
+
+Description:
+Only trusted and verified employers.
+
+🎯 Radius-Based Matching
+
+Description:
+Jobs filtered based on your selected radius.
+
+Requirements:
+
+* Responsive cards.
+* Consistent styling.
+* Match existing card design.
+
+---
+
+C. How JobNearby Works ⚡
+
+Create two columns.
+
+FOR JOB SEEKERS
+
+1. Set Location
+2. Browse Nearby Jobs
+3. Apply Instantly
+
+FOR RECRUITERS
+
+1. Post Job
+2. Receive Applications
+3. Hire Local Talent
+
+Requirements:
+
+* Responsive layout.
+* Icons allowed.
+* Match current design.
+
+---
+
+D. Call-To-Action Section 🚀
+
+Add large section above footer.
+
+Heading:
+
+Ready to find your next opportunity?
+
+Buttons:
+
+Find Jobs
+
+Post a Job
+
+Requirements:
+
+* Consistent with current design.
+* Fully responsive.
+* Match theme colors.
+
+---
+
+19. Authenticated Home Experience
+
+BEFORE LOGIN:
+
+Show:
+
+* Hero Section
+* Statistics Section
+* Why Choose JobNearby
+* How It Works
+* CTA Section
+* Footer
+
+AFTER JOB SEEKER LOGIN:
+
+Show:
+
+* Home Map Section
+* Nearby Jobs Section
+* Browse Jobs Section
+* Profile Dropdown
+* Footer
+
+Hide:
+
+* Hero Section
+* Statistics Section
+* Why Choose JobNearby
+* How It Works
+* CTA Section
+* Sign In
+* Get Started
+
+Reason:
+
+Authenticated users should immediately access job-search functionality rather than marketing content.
+
+---
+
+20. Browse Jobs Placement
+
+After Job Seeker Login:
+
+Place:
+
+Browse Jobs
+
+directly below:
+
+Map Section
+
+Structure:
+
+Map Section
+
+↓
+
+Nearby Jobs
+
+↓
+
+Browse Jobs
+
+↓
+
+Footer
+
+Requirements:
+
+* Browse Jobs updates dynamically.
+* Connected to MongoDB jobs.
+* Works with radius filtering.
+* Works with category filtering.
+* Works with location filtering.
+
+---
+
+21. Design Protection (CRITICAL)
+
+DO NOT CHANGE:
+
+* Existing color palette
+* Existing typography
+* Existing navbar height
+* Existing spacing system
+* Existing responsiveness
+* Existing cards styling
+* Existing shadows
+* Existing animations
+* Existing mobile layouts
+
+Only add functionality and new sections using the current design language.
+
+FINAL GOAL
+
+✓ Globe icon replaces language text
+
+✓ Post Job removed from public navbar
+
+✓ Profile dropdown added after login
+
+✓ Dashboard options accessible from profile menu
+
+✓ Automatic redirect after login
+
+✓ Sign In and Get Started hidden after login
+
+✓ Marketing sections visible before login
+
+✓ Marketing sections hidden after login
+
+✓ Statistics section added
+
+✓ Why Choose JobNearby section added
+
+✓ How JobNearby Works section added
+
+✓ CTA section added
+
+✓ Browse Jobs appears below map section
+
+✓ Fully responsive
+
+✓ No design changes
+
+✓ Production-ready implementation

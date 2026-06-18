@@ -5,11 +5,13 @@ import {
   createUser,
   updateUser,
   deleteUser,
+  nearbySeekers,
 } from "../controllers/user.controller.js";
 import { requireAuth } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
+router.get("/users/nearby-seekers", nearbySeekers);
 router.get("/users", listUsers);
 router.get("/users/:id", getUser);
 router.post("/users", createUser);
