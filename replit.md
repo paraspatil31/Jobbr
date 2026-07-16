@@ -1,36 +1,44 @@
-# [Project name]
+# JobNearby
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A location-aware job board that connects talent with local opportunities. Built as a MERN monorepo with a React + Vite frontend, Express + TypeScript backend, and MongoDB via Mongoose (with in-memory fallback for development).
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
+- `pnpm dev` — start both client (port 5173) and server (port 8080) in development mode
+- `pnpm --filter @workspace/client run dev` — client only
+- `pnpm --filter @workspace/server run dev` — server only
 - `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm run typecheck` — full typecheck across all packages
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- pnpm workspaces, Node.js 20, TypeScript 5.9
+- Frontend: React 19, Vite 7, Tailwind CSS v4, shadcn/ui, Wouter, Leaflet/react-leaflet
+- Backend: Express 5, tsx (dev), esbuild (prod build)
+- Database: MongoDB + Mongoose 8 (in-memory fallback via mongodb-memory-server — no Atlas needed in dev)
+- Auth: JWT (jsonwebtoken + bcryptjs)
+- Logging: Pino
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `apps/client/src/pages/` — page components (Home, MapExplorer, Auth, SeekerDashboard, RecruiterDashboard)
+- `apps/client/src/components/` — shared UI components (JobMap, shadcn/ui)
+- `apps/client/src/api/` — typed API service layer (auth, jobs, users)
+- `apps/server/src/` — Express app, routes, models, config
+- `apps/server/src/config/database.ts` — MongoDB connect with in-memory fallback
+- `packages/` — shared libs: api-client-react, api-spec, api-zod, db
+
+## Environment
+
+- `JWT_SECRET` — set in .replit userenv (shared)
+- `SESSION_SECRET` — available as Replit secret
+- No external DB credentials needed in development (in-memory MongoDB fallback)
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
-
-## Product
-
-_Describe the high-level user-facing capabilities of this app once they exist._
+- MongoDB in-memory fallback means the app works immediately with zero external setup
+- Client proxies `/api` requests to `http://localhost:8080` via Vite dev server config
+- Port 5173 → client, Port 8080 → server
 
 ## User preferences
 
@@ -38,7 +46,8 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Server requires `PORT` env var to be set (handled by `scripts/dev.cjs`)
+- After code changes to the server, tsx watch hot-reloads automatically
 
 ## Pointers
 

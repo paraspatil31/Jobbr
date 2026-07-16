@@ -1,0 +1,264 @@
+Act as a Senior React + TypeScript + Tailwind CSS UI/UX Engineer.
+
+I already have a Job Seeker Dashboard with:
+- Responsive navbar
+- Hero search section
+- Interactive map using React Leaflet
+- Browse Jobs section
+- Saved Jobs page
+- User Profile page
+
+Do NOT redesign the existing layout. Instead, improve it by adding modern dashboard features while maintaining the current color scheme (white, yellow, gray) and keeping everything responsive.
+
+The design should feel like a combination of LinkedIn, Indeed, Google Jobs, and Airbnb.
+
+Add the following sections in a logical order:
+
+1. Dashboard Statistics Cards
+- Applied Jobs
+- Saved Jobs
+- Interviews
+- Profile Views
+Each card should contain an icon, count, and small growth indicator.
+
+2. Recommended Jobs
+Display personalized job cards with:
+- Company logo
+- Job title
+- Company name
+- Location
+- Salary
+- Match percentage (e.g., 92% Match)
+- Posted time
+- Save button
+- Apply button
+
+3. Nearby Jobs
+Using the user's current location, display jobs within:
+- 2 km
+- 5 km
+- 10 km
+Each card should show distance.
+
+4. Recently Viewed Jobs
+Display the last jobs viewed with timestamps.
+
+5. Application Tracker
+Show job application status using colored badges:
+- Applied
+- Under Review
+- Interview Scheduled
+- Offer
+- Rejected
+
+Include a progress bar or timeline.
+
+6. Job Alerts
+Create a widget showing:
+- Active alerts
+- Alert frequency
+- Last updated
+- Manage Alerts button
+
+Allow users to:
+- Create alerts
+- Edit alerts
+- Pause alerts
+- Delete alerts
+
+7. Resume Section
+Display:
+- Uploaded resume name
+- Last updated date
+- Resume score (out of 100)
+- Upload New Resume button
+- Download Resume button
+
+8. Profile Completion
+Show a circular progress indicator.
+
+Display completed and missing profile information:
+- Resume
+- Skills
+- Education
+- Experience
+- Portfolio
+- Certifications
+
+9. Quick Filters
+Create filter chips:
+- Full Time
+- Part Time
+- Internship
+- Remote
+- Fresher
+- Nearby
+- High Salary
+- Recently Posted
+
+10. Improved Job Cards
+Enhance the current job cards by including:
+- Company logo
+- Rating
+- Salary range
+- Experience required
+- Work mode (Remote / Hybrid / Onsite)
+- Job type
+- Skills
+- Posted time
+- Save icon
+- Share icon
+- Apply button
+
+11. AI Career Assistant
+Add a floating AI assistant button at the bottom-right.
+
+When clicked, open a modern chat panel with suggested actions:
+- Find jobs near me
+- Improve my resume
+- Prepare interview questions
+- Suggest careers
+- Recommend jobs based on my profile
+
+12. Notifications Panel
+Accessible from the navbar bell icon.
+
+Include:
+- New job recommendations
+- Recruiter viewed your profile
+- Interview reminders
+- Application updates
+
+13. Companies Hiring
+Display a horizontal scrollable section showing:
+- Company logo
+- Company name
+- Number of open positions
+- Company rating (optional)
+
+16. Empty States
+Every section should have beautiful empty state illustrations and helpful messages when there is no data.
+
+-------------------------------------
+BACKEND & RECRUITER PANEL INTEGRATION
+-------------------------------------
+
+Do not implement only the Job Seeker Dashboard.
+
+Also make all the necessary backend, database, API, and Recruiter Dashboard changes so these features work completely.
+
+Update the Recruiter side wherever required.
+
+Examples include:
+
+• Application Tracker
+- Recruiters should be able to change application status:
+  - Applied
+  - Under Review
+  - Interview Scheduled
+  - Offer
+  - Rejected
+- Status updates should instantly reflect on the Job Seeker Dashboard.
+
+• Profile Views
+- Track when recruiters view a candidate's profile.
+- Increment profile view count.
+- Show profile views on the candidate dashboard.
+
+• Recommended Jobs
+- Ensure recruiter-created job posts contain enough metadata:
+  - Skills
+  - Experience
+  - Salary
+  - Category
+  - Work Mode
+  - Location
+- Backend should return personalized recommendations.
+
+• Nearby Jobs
+- Use existing latitude and longitude.
+- Return jobs sorted by nearest distance.
+
+• Recently Viewed Jobs
+- Save viewed jobs per user.
+- Show recent history.
+
+• Job Alerts
+Recruiter job postings should trigger alerts for matching users based on:
+- Job title
+- Skills
+- Category
+- Salary
+- Radius
+- Location
+
+• Notifications
+Generate notifications when:
+- Recruiter views profile
+- Application status changes
+- New nearby job is posted
+- New recommended job becomes available
+
+• Companies Hiring
+Automatically populate from recruiters with active job postings.
+
+• Resume Section
+Allow recruiters to download applicant resumes from the applicant profile.
+
+-------------------------------------
+DATABASE
+-------------------------------------
+
+Update MongoDB schemas where necessary.
+
+Create any required collections such as:
+- Notifications
+- Job Alerts
+- Recently Viewed Jobs
+- Profile Views
+- Applications
+- Resume Metadata
+
+Add indexes where appropriate.
+
+-------------------------------------
+API
+-------------------------------------
+
+Create REST APIs for all new functionality.
+
+Follow the existing Express + MongoDB architecture.
+
+Use clean controllers, services, and routes.
+
+-------------------------------------
+UI REQUIREMENTS
+-------------------------------------
+
+- Tailwind CSS only
+- Lucide React icons
+- shadcn/ui components where appropriate
+- Smooth hover animations
+- Rounded corners (xl / 2xl)
+- Soft shadows
+- Glassmorphism where appropriate
+- Responsive for mobile, tablet, and desktop
+- Dark mode support
+- Skeleton loaders
+- Beautiful loading states
+- Accessible components with proper ARIA labels
+
+-------------------------------------
+CODE REQUIREMENTS
+-------------------------------------
+
+- React + TypeScript only
+- Reusable components
+- Modular architecture
+- Clean folder structure
+- Mock JSON data where backend is unavailable
+- Avoid duplicate code
+- Follow production-level best practices
+- Do not break any existing pages or functionality.
+- Integrate everything naturally into the existing project instead of replacing the current layout.
+- Keep the current UI design and branding intact while enhancing the dashboard.
