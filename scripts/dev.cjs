@@ -9,7 +9,7 @@ function prefix(name, color, line) {
 function spawnWithPrefix(name, color, cmd, args, env) {
   const proc = spawn(cmd, args, {
     env: { ...process.env, ...env },
-    shell: false,
+    shell: process.platform === 'win32',
   });
 
   proc.stdout.on('data', (data) => {
@@ -25,8 +25,16 @@ function spawnWithPrefix(name, color, cmd, args, env) {
   return proc;
 }
 
-const server = spawnWithPrefix('server', colors.server, 'pnpm', ['--filter', '@workspace/server', 'run', 'dev'], {});
-const client = spawnWithPrefix('client', colors.client, 'pnpm', ['--filter', '@workspace/client', 'run', 'dev'], {});
+const pnpmCmd = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+const serverEnv = { PORT: process.env.PORT ?? '8080' };
+const server = spawnWithPrefix(
+  'server',
+  colors.server,
+  pnpmCmd,
+  ['--filter', '@workspace/server', 'run', 'dev'],
+  serverEnv
+);
+const client = spawnWithPrefix('client', colors.client, pnpmCmd, ['--filter', '@workspace/client', 'run', 'dev'], {});
 
 function shutdown() {
   server.kill('SIGTERM');
