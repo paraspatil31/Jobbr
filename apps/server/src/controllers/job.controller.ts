@@ -1,4 +1,5 @@
 import { type Request, type Response, type NextFunction } from "express";
+import type { PipelineStage } from "mongoose";
 import { JobModel } from "../models/index.js";
 import { AppError } from "../middlewares/error.middleware.js";
 
@@ -18,6 +19,10 @@ export async function listJobs(
     const filter: Record<string, unknown> = { isActive: true };
     if (type) filter["type"] = type;
     if (search) filter["$text"] = { $search: search };
+    // Recruiters only see their own jobs
+    if (req.auth?.role === "recruiter") {
+      filter["recruiter"] = req.auth.userId;
+    }
 
     const pageNum = Math.max(1, parseInt(page, 10));
     const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10)));
@@ -73,16 +78,16 @@ export async function nearbyJobs(
     let categories: Array<{ name: string; count: number }> = [];
 
     try {
-      const pipeline = [
+      const pipeline: PipelineStage[] = [
         {
           $geoNear: {
-            near: { type: "Point" as const, coordinates: [lng, lat] },
+            near: { type: "Point" as const, coordinates: [lng, lat] as [number, number] },
             distanceField: "distance",
             maxDistance,
             spherical: true,
             query: { isActive: true },
           },
-        },
+        } as PipelineStage,
         {
           $facet: {
             jobs: [{ $limit: 200 }],
@@ -92,7 +97,7 @@ export async function nearbyJobs(
               { $sort: { count: -1 } },
             ],
           },
-        },
+        } as PipelineStage,
       ];
 
       const [result] = await JobModel.aggregate(pipeline);

@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MapPin, Plus, Briefcase, Users, Eye, LogOut, Bell,
   ChevronDown, X, Building2, CheckCircle2, Clock, DollarSign,
   MoreHorizontal, ToggleLeft, ToggleRight, UserCheck, Mail,
-  Phone, Star, ChevronRight, Search, Filter, Inbox,
+  Phone, Star, ChevronRight, Search, Filter, Inbox, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { getUser, clearSession } from "@/lib/api";
 /* ─── Types ──────────────────────────────────────────────────── */
 type RecTab = "listings" | "applicants";
 type AppStage = "applied" | "reviewing" | "interview" | "offer" | "rejected";
+type WorkMode = "remote" | "hybrid" | "onsite";
 
 interface PostedJob {
   id: string; title: string; type: string; location: string;
@@ -25,7 +26,7 @@ interface Applicant {
   id: string; jobId: string; name: string; initials: string;
   avatarColor: string; title: string; location: string;
   skills: string[]; appliedDate: string; stage: AppStage;
-  rating: number; email: string; note?: string;
+  rating: number; email: string; note?: string; experience?: string;
 }
 
 /* ─── Mock data ──────────────────────────────────────────────── */
@@ -36,30 +37,43 @@ const INITIAL_JOBS: PostedJob[] = [
 ];
 
 const INITIAL_APPLICANTS: Applicant[] = [
-  { id: "c1", jobId: "1", name: "Alex Rivera", initials: "AR", avatarColor: "bg-blue-500",    title: "Frontend Engineer", location: "SF, CA",      skills: ["React", "TypeScript", "GraphQL"],    appliedDate: "Jun 8",  stage: "interview", rating: 5, email: "alex@example.com", note: "Strong portfolio. Cleared coding round." },
-  { id: "c2", jobId: "1", name: "Jamie Chen",  initials: "JC", avatarColor: "bg-purple-500",  title: "React Developer",   location: "Oakland, CA", skills: ["React", "Redux", "Jest"],            appliedDate: "Jun 7",  stage: "reviewing", rating: 4, email: "jamie@example.com" },
-  { id: "c3", jobId: "1", name: "Sam Patel",   initials: "SP", avatarColor: "bg-green-500",   title: "UI Developer",      location: "SF, CA",      skills: ["React", "Tailwind", "Vite"],         appliedDate: "Jun 9",  stage: "applied",   rating: 3, email: "sam@example.com" },
-  { id: "c4", jobId: "1", name: "Morgan Lee",  initials: "ML", avatarColor: "bg-orange-500",  title: "Senior Frontend",   location: "San Jose, CA",skills: ["React", "TypeScript", "AWS"],        appliedDate: "Jun 6",  stage: "offer",     rating: 5, email: "morgan@example.com", note: "Offer sent. Awaiting acceptance by Jun 15." },
-  { id: "c5", jobId: "2", name: "Taylor Kim",  initials: "TK", avatarColor: "bg-pink-500",    title: "Product Designer",  location: "SF, CA",      skills: ["Figma", "Prototyping", "Research"],  appliedDate: "Jun 5",  stage: "interview", rating: 4, email: "taylor@example.com" },
-  { id: "c6", jobId: "2", name: "Jordan Wu",   initials: "JW", avatarColor: "bg-cyan-500",    title: "UX Designer",       location: "Remote",      skills: ["Figma", "Adobe XD", "Sketch"],       appliedDate: "Jun 4",  stage: "reviewing", rating: 3, email: "jordan@example.com" },
-  { id: "c7", jobId: "2", name: "Casey Nguyen",initials: "CN", avatarColor: "bg-rose-500",    title: "Visual Designer",   location: "Berkeley, CA",skills: ["Figma", "Motion", "Branding"],       appliedDate: "Jun 6",  stage: "rejected",  rating: 2, email: "casey@example.com" },
-  { id: "c8", jobId: "3", name: "Riley Brooks",initials: "RB", avatarColor: "bg-indigo-500",  title: "Backend Engineer",  location: "Oakland, CA", skills: ["Node.js", "MongoDB", "Docker"],      appliedDate: "May 28", stage: "reviewing", rating: 4, email: "riley@example.com" },
-  { id: "c9", jobId: "3", name: "Drew Hassan", initials: "DH", avatarColor: "bg-amber-500",   title: "Full-stack Dev",    location: "SF, CA",      skills: ["Node.js", "PostgreSQL", "Redis"],    appliedDate: "May 27", stage: "applied",   rating: 3, email: "drew@example.com" },
+  { id: "c1", jobId: "1", name: "Alex Rivera",   initials: "AR", avatarColor: "bg-blue-500",    title: "Frontend Engineer", location: "SF, CA",       skills: ["React", "TypeScript", "GraphQL"],   appliedDate: "Jun 8",  stage: "interview", rating: 5, email: "alex@example.com",   note: "Strong portfolio. Cleared coding round.", experience: "5 years exp" },
+  { id: "c2", jobId: "1", name: "Jamie Chen",    initials: "JC", avatarColor: "bg-purple-500",  title: "React Developer",   location: "Oakland, CA",  skills: ["React", "Redux", "Jest"],           appliedDate: "Jun 7",  stage: "reviewing", rating: 4, email: "jamie@example.com",  experience: "3 years exp" },
+  { id: "c3", jobId: "1", name: "Sam Patel",     initials: "SP", avatarColor: "bg-green-500",   title: "UI Developer",      location: "SF, CA",       skills: ["React", "Tailwind", "Vite"],        appliedDate: "Jun 9",  stage: "applied",   rating: 3, email: "sam@example.com",    experience: "2 years exp" },
+  { id: "c4", jobId: "1", name: "Morgan Lee",    initials: "ML", avatarColor: "bg-orange-500",  title: "Senior Frontend",   location: "San Jose, CA", skills: ["React", "TypeScript", "AWS"],       appliedDate: "Jun 6",  stage: "offer",     rating: 5, email: "morgan@example.com", note: "Offer sent. Awaiting acceptance by Jun 15.", experience: "7 years exp" },
+  { id: "c5", jobId: "2", name: "Taylor Kim",    initials: "TK", avatarColor: "bg-pink-500",    title: "Product Designer",  location: "SF, CA",       skills: ["Figma", "Prototyping", "Research"], appliedDate: "Jun 5",  stage: "interview", rating: 4, email: "taylor@example.com", experience: "4 years exp" },
+  { id: "c6", jobId: "2", name: "Jordan Wu",     initials: "JW", avatarColor: "bg-cyan-500",    title: "UX Designer",       location: "Remote",       skills: ["Figma", "Adobe XD", "Sketch"],      appliedDate: "Jun 4",  stage: "reviewing", rating: 3, email: "jordan@example.com", experience: "3 years exp" },
+  { id: "c7", jobId: "2", name: "Casey Nguyen",  initials: "CN", avatarColor: "bg-rose-500",    title: "Visual Designer",   location: "Berkeley, CA", skills: ["Figma", "Motion", "Branding"],      appliedDate: "Jun 6",  stage: "rejected",  rating: 2, email: "casey@example.com",  experience: "1 year exp" },
+  { id: "c8", jobId: "3", name: "Riley Brooks",  initials: "RB", avatarColor: "bg-indigo-500",  title: "Backend Engineer",  location: "Oakland, CA",  skills: ["Node.js", "MongoDB", "Docker"],     appliedDate: "May 28", stage: "reviewing", rating: 4, email: "riley@example.com",  experience: "4 years exp" },
+  { id: "c9", jobId: "3", name: "Drew Hassan",   initials: "DH", avatarColor: "bg-amber-500",   title: "Full-stack Dev",    location: "SF, CA",       skills: ["Node.js", "PostgreSQL", "Redis"],   appliedDate: "May 27", stage: "applied",   rating: 3, email: "drew@example.com",   experience: "2 years exp" },
+];
+
+const MOCK_NOTIFICATIONS = [
+  { id: "n1", text: "Alex Rivera accepted interview for Senior React Developer", time: "2m ago", read: false },
+  { id: "n2", text: "2 new applicants for UI/UX Designer", time: "1h ago", read: false },
+  { id: "n3", text: "Jordan Wu updated their profile", time: "3h ago", read: true },
 ];
 
 /* ─── Config ─────────────────────────────────────────────────── */
 const TYPE_LABELS: Record<string, string> = { "full-time": "Full-time", "part-time": "Part-time", contract: "Contract", freelance: "Freelance" };
 const TYPE_COLORS: Record<string, string> = { "full-time": "bg-green-100 text-green-700", "part-time": "bg-blue-100 text-blue-700", contract: "bg-orange-100 text-orange-700", freelance: "bg-purple-100 text-purple-700" };
 
-const STAGE_CONFIG: Record<AppStage, { label: string; color: string; bg: string; border: string }> = {
-  applied:   { label: "Applied",        color: "text-slate-600",  bg: "bg-slate-100",  border: "border-slate-200" },
-  reviewing: { label: "Under Review",   color: "text-blue-600",   bg: "bg-blue-100",   border: "border-blue-200" },
-  interview: { label: "Interview",      color: "text-amber-600",  bg: "bg-amber-100",  border: "border-amber-200" },
-  offer:     { label: "Offer Sent",     color: "text-green-600",  bg: "bg-green-100",  border: "border-green-200" },
-  rejected:  { label: "Not a Fit",      color: "text-red-500",    bg: "bg-red-100",    border: "border-red-200" },
+const STAGE_CONFIG: Record<AppStage, { label: string; color: string; bg: string; border: string; line: string }> = {
+  applied:   { label: "Applied",      color: "text-slate-600",  bg: "bg-slate-100",  border: "border-slate-200", line: "bg-slate-400" },
+  reviewing: { label: "Under Review", color: "text-blue-600",   bg: "bg-blue-100",   border: "border-blue-200",  line: "bg-blue-400" },
+  interview: { label: "Interview",    color: "text-amber-600",  bg: "bg-amber-100",  border: "border-amber-200", line: "bg-amber-400" },
+  offer:     { label: "Offer Sent",   color: "text-green-600",  bg: "bg-green-100",  border: "border-green-200", line: "bg-green-400" },
+  rejected:  { label: "Not a Fit",   color: "text-red-500",    bg: "bg-red-100",    border: "border-red-200",   line: "bg-red-400" },
 };
 
 const STAGE_ORDER: AppStage[] = ["applied", "reviewing", "interview", "offer", "rejected"];
+
+/* ─── Mock match score per job ───────────────────────────────── */
+const JOB_MATCH: Record<string, { label: string; cls: string }> = {
+  "1": { label: "High demand", cls: "text-green-600 bg-green-50 border-green-200" },
+  "2": { label: "Medium",      cls: "text-yellow-600 bg-yellow-50 border-yellow-200" },
+  "3": { label: "High demand", cls: "text-green-600 bg-green-50 border-green-200" },
+};
 
 /* ─── Component ─────────────────────────────────────────────── */
 export default function RecruiterDashboard() {
@@ -73,8 +87,116 @@ export default function RecruiterDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [showApplicantId, setShowApplicantId] = useState<string | null>(null);
-  const [form, setForm] = useState({ title: "", type: "full-time", location: "", salary: "", description: "", skills: "" });
+  const [form, setForm] = useState({
+    title: "", type: "full-time", location: "", salary: "", description: "", skills: "",
+    workMode: "onsite" as WorkMode, experience: "", category: "Engineering",
+  });
   const [posted, setPosted] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  /* load real recruiter jobs on mount */
+  useEffect(() => {
+    const token = localStorage.getItem("jn_token");
+    if (!token) return;
+    fetch("/api/jobs", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: unknown) => {
+        if (data && typeof data === "object") {
+          const d = data as { jobs?: Record<string, unknown>[] };
+          const list = d.jobs ?? [];
+          if (list.length > 0) {
+            const mapped: PostedJob[] = list.map((j) => ({
+              id: String(j["_id"]),
+              title: String(j["title"] ?? ""),
+              type: String(j["type"] ?? "full-time"),
+              location: String(j["location"] ?? ""),
+              salary: String(j["salary"] ?? "Negotiable"),
+              applicants: 0,
+              views: 0,
+              posted: new Date(String(j["createdAt"])).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+              active: Boolean(j["isActive"] ?? true),
+            }));
+            setJobs(mapped);
+            if (mapped.length > 0) setSelectedJobId(mapped[0].id);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  /* load real applicants when selected job changes */
+  useEffect(() => {
+    if (!selectedJobId) return;
+    const token = localStorage.getItem("jn_token");
+    if (!token) return;
+    fetch(`/api/applications/job/${selectedJobId}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: unknown) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const colors = ["bg-blue-500","bg-purple-500","bg-green-500","bg-orange-500","bg-pink-500","bg-cyan-500","bg-rose-500","bg-indigo-500","bg-amber-500"];
+          const mapped: Applicant[] = (data as Record<string, unknown>[]).map((a, i) => {
+            const seeker = a["seeker"] as Record<string, unknown> | null;
+            const name = String(seeker?.["fullName"] ?? "Applicant");
+            return {
+              id: String(a["_id"]),
+              jobId: selectedJobId,
+              name,
+              initials: name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2),
+              avatarColor: colors[i % colors.length],
+              title: String(seeker?.["jobTitle"] ?? ""),
+              location: String(seeker?.["location"] ?? ""),
+              skills: Array.isArray(seeker?.["skills"]) ? (seeker!["skills"] as string[]) : [],
+              appliedDate: new Date(String(a["createdAt"])).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+              stage: (a["status"] as AppStage) ?? "applied",
+              rating: 3,
+              email: String(seeker?.["email"] ?? ""),
+              note: a["note"] as string | undefined,
+            };
+          });
+          setApplicants(prev => {
+            // Replace applicants for this job, keep others (other jobs' mock data)
+            const otherJobs = prev.filter(ap => ap.jobId !== selectedJobId);
+            return [...otherJobs, ...mapped];
+          });
+        }
+      })
+      .catch(() => {}); // Keep mock data if API fails or job has no real applicants
+  }, [selectedJobId]);
+
+  /* Load real recruiter notifications */
+  useEffect(() => {
+    const token = localStorage.getItem("jn_token");
+    if (!token) return;
+    fetch("/api/notifications", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: unknown) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped = (data as Record<string, unknown>[]).map((n) => ({
+            id: String(n["_id"]),
+            text: String(n["body"] ?? n["title"] ?? ""),
+            time: new Date(String(n["createdAt"])).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+            read: Boolean(n["read"]),
+          }));
+          setNotifications(mapped);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  /* close notifications on outside click */
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const signOut = () => { clearSession(); navigate("/"); };
 
@@ -84,13 +206,50 @@ export default function RecruiterDashboard() {
   const handlePost = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title || !form.location || !form.description) return;
-    setJobs((p) => [{ id: String(Date.now()), title: form.title, type: form.type, location: form.location, salary: form.salary || "Negotiable", applicants: 0, views: 0, posted: "Just now", active: true }, ...p]);
+    setJobs((p) => [{
+      id: String(Date.now()), title: form.title, type: form.type,
+      location: form.location, salary: form.salary || "Negotiable",
+      applicants: 0, views: 0, posted: "Just now", active: true,
+    }, ...p]);
     setPosted(true);
-    setTimeout(() => { setPosted(false); setShowModal(false); setForm({ title: "", type: "full-time", location: "", salary: "", description: "", skills: "" }); }, 1800);
+    setTimeout(() => {
+      setPosted(false);
+      setShowModal(false);
+      setForm({ title: "", type: "full-time", location: "", salary: "", description: "", skills: "", workMode: "onsite", experience: "", category: "Engineering" });
+    }, 1800);
+    const token = localStorage.getItem("jn_token");
+    if (token) {
+      fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          title: form.title,
+          company: (user as Record<string, string> | null)?.companyName ?? "My Company",
+          category: form.category,
+          type: form.type,
+          location: form.location,
+          description: form.description,
+          salary: form.salary,
+          skills: form.skills.split(",").map((s: string) => s.trim()).filter(Boolean),
+        }),
+      }).catch(() => {});
+    }
   };
 
-  const updateStage = (applicantId: string, stage: AppStage) =>
+  const updateStage = (applicantId: string, stage: AppStage) => {
     setApplicants((p) => p.map((a) => a.id === applicantId ? { ...a, stage } : a));
+    // Best-effort sync to backend
+    const token = localStorage.getItem("jn_token");
+    if (token) {
+      fetch(`/api/applications/${applicantId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: stage }),
+      }).catch(() => {});
+    }
+  };
+
+  const markAllRead = () => setNotifications((n) => n.map((x) => ({ ...x, read: true })));
 
   const activeJobs = jobs.filter((j) => j.active).length;
   const totalApplicants = applicants.length;
@@ -125,10 +284,53 @@ export default function RecruiterDashboard() {
             <span className="font-extrabold text-base tracking-tight">JobNearby</span>
           </Link>
           <div className="flex items-center gap-3">
-            <button className="relative w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:bg-secondary/80 transition-colors">
-              <Bell className="w-4 h-4" />
-              {interviewCount > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-400" />}
-            </button>
+            {/* Notification bell with dropdown */}
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => setShowNotifications((v) => !v)}
+                className="relative w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:bg-secondary/80 transition-colors"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-400 text-white text-[10px] font-bold flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+              <AnimatePresence>
+                {showNotifications && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-border/50 z-50 overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
+                      <span className="font-bold text-sm">Notifications</span>
+                      {unreadCount > 0 && (
+                        <button onClick={markAllRead} className="text-xs text-primary font-semibold hover:underline">
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+                    <div className="divide-y divide-border/30 max-h-72 overflow-y-auto">
+                      {notifications.map((n) => (
+                        <div key={n.id} className={`px-4 py-3 text-sm flex items-start gap-2 ${n.read ? "opacity-60" : ""}`}>
+                          {!n.read && <span className="mt-1.5 w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />}
+                          {n.read && <span className="mt-1.5 w-2 h-2 flex-shrink-0" />}
+                          <div className="flex-1 min-w-0">
+                            <p className="leading-snug text-foreground">{n.text}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{n.time}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             <div className="flex items-center gap-2 pl-3 border-l border-border">
               <div className="w-8 h-8 rounded-full bg-blue-500/15 flex items-center justify-center text-blue-600 text-xs font-bold">
                 {user?.fullName?.[0]?.toUpperCase() ?? "R"}
@@ -161,7 +363,7 @@ export default function RecruiterDashboard() {
             <h1 className="text-2xl font-extrabold text-white">Welcome, {user?.fullName?.split(" ")[0] ?? "Recruiter"}</h1>
             <p className="text-slate-400 text-sm mt-1">{activeJobs} active listing{activeJobs !== 1 ? "s" : ""} · {totalApplicants} candidates in pipeline.</p>
           </div>
-          <div className="relative hidden md:flex items-center gap-6 text-white">
+          <div className="relative hidden md:flex items-center gap-4 text-white">
             {[
               { icon: Briefcase, label: "Active jobs",  value: String(activeJobs) },
               { icon: Users,     label: "Applicants",   value: String(totalApplicants) },
@@ -176,6 +378,14 @@ export default function RecruiterDashboard() {
                 <p className="text-xs text-slate-400 mt-0.5">{label}</p>
               </div>
             ))}
+            {/* Profile views tracking card */}
+            <div className="ml-2 pl-4 border-l border-white/20 text-center">
+              <div className="w-10 h-10 rounded-xl bg-amber-400/20 flex items-center justify-center mx-auto mb-1">
+                <Eye className="w-5 h-5 text-amber-300" />
+              </div>
+              <p className="text-xl font-extrabold leading-none text-amber-300">8</p>
+              <p className="text-xs text-slate-400 mt-0.5">Profile views<br />this week</p>
+            </div>
           </div>
         </motion.div>
 
@@ -208,44 +418,51 @@ export default function RecruiterDashboard() {
           {tab === "listings" && (
             <motion.div key="listings" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
               <div className="space-y-3">
-                {jobs.map((job, i) => (
-                  <motion.div key={job.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
-                    className={`bg-white rounded-2xl border shadow-sm p-5 flex flex-col sm:flex-row sm:items-center gap-4 transition-all ${job.active ? "border-border/50" : "border-border/30 opacity-60"}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-bold truncate">{job.title}</h3>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${TYPE_COLORS[job.type]}`}>{TYPE_LABELS[job.type]}</span>
-                        {!job.active && <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 flex-shrink-0">Paused</span>}
+                {jobs.map((job, i) => {
+                  const match = JOB_MATCH[job.id] ?? { label: "Medium", cls: "text-yellow-600 bg-yellow-50 border-yellow-200" };
+                  return (
+                    <motion.div key={job.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
+                      className={`bg-white rounded-2xl border shadow-sm p-5 flex flex-col sm:flex-row sm:items-center gap-4 transition-all ${job.active ? "border-border/50" : "border-border/30 opacity-60"}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-bold truncate">{job.title}</h3>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${TYPE_COLORS[job.type]}`}>{TYPE_LABELS[job.type]}</span>
+                          {!job.active && <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 flex-shrink-0">Paused</span>}
+                          {/* Match score badge */}
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border flex-shrink-0 ${match.cls}`}>
+                            {match.label}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{job.location}</span>
+                          <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{job.salary}</span>
+                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Posted {job.posted}</span>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{job.location}</span>
-                        <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{job.salary}</span>
-                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Posted {job.posted}</span>
+                      <div className="flex items-center gap-6 text-center flex-shrink-0">
+                        <div><p className="text-lg font-extrabold leading-none">{applicants.filter(a => a.jobId === job.id).length}</p><p className="text-xs text-muted-foreground mt-0.5">Applicants</p></div>
+                        <div><p className="text-lg font-extrabold leading-none">{job.views}</p><p className="text-xs text-muted-foreground mt-0.5">Views</p></div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-6 text-center flex-shrink-0">
-                      <div><p className="text-lg font-extrabold leading-none">{applicants.filter(a => a.jobId === job.id).length}</p><p className="text-xs text-muted-foreground mt-0.5">Applicants</p></div>
-                      <div><p className="text-lg font-extrabold leading-none">{job.views}</p><p className="text-xs text-muted-foreground mt-0.5">Views</p></div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => { setSelectedJobId(job.id); setTab("applicants"); }}
-                        className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors px-3 py-1.5 rounded-lg border border-primary/30 hover:border-primary/60 bg-primary/5"
-                      >
-                        <Users className="w-3.5 h-3.5" /> View Applicants
-                      </button>
-                      <button onClick={() => toggleActive(job.id)}
-                        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg border border-border/60 hover:border-border bg-secondary/40"
-                      >
-                        {job.active ? <><ToggleRight className="w-4 h-4 text-green-500" /> Active</> : <><ToggleLeft className="w-4 h-4" /> Paused</>}
-                      </button>
-                      <button className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => { setSelectedJobId(job.id); setTab("applicants"); }}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors px-3 py-1.5 rounded-lg border border-primary/30 hover:border-primary/60 bg-primary/5"
+                        >
+                          <Users className="w-3.5 h-3.5" /> View Applicants
+                        </button>
+                        <button onClick={() => toggleActive(job.id)}
+                          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg border border-border/60 hover:border-border bg-secondary/40"
+                        >
+                          {job.active ? <><ToggleRight className="w-4 h-4 text-green-500" /> Active</> : <><ToggleLeft className="w-4 h-4" /> Paused</>}
+                        </button>
+                        <button className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
               {jobs.length === 0 && (
                 <div className="text-center py-20 text-muted-foreground">
@@ -287,12 +504,15 @@ export default function RecruiterDashboard() {
                   {STAGE_ORDER.map((stage) => {
                     const cfg = STAGE_CONFIG[stage];
                     const n = pipelineCounts[stage] ?? 0;
+                    const isSelected = stageFilter === stage;
                     return (
                       <button key={stage} onClick={() => setStageFilter(stageFilter === stage ? "all" : stage)}
-                        className={`rounded-xl border p-3 text-center transition-all ${stageFilter === stage ? `${cfg.bg} ${cfg.border} shadow-sm` : "bg-white border-border/50 hover:border-primary/20 shadow-sm"}`}
+                        className={`rounded-xl border p-3 text-center transition-all relative overflow-hidden ${isSelected ? `${cfg.bg} ${cfg.border} shadow-sm` : "bg-white border-border/50 hover:border-primary/20 shadow-sm"}`}
                       >
-                        <p className={`text-2xl font-extrabold leading-none ${stageFilter === stage ? cfg.color : "text-foreground"}`}>{n}</p>
-                        <p className={`text-[11px] font-medium mt-1 ${stageFilter === stage ? cfg.color : "text-muted-foreground"}`}>{cfg.label}</p>
+                        {/* bottom color line */}
+                        <div className={`absolute bottom-0 left-0 right-0 h-1 ${cfg.line}`} />
+                        <p className={`text-2xl font-extrabold leading-none ${cfg.color}`}>{n}</p>
+                        <p className={`text-[11px] font-medium mt-1 ${isSelected ? cfg.color : "text-muted-foreground"}`}>{cfg.label}</p>
                       </button>
                     );
                   })}
@@ -333,12 +553,15 @@ export default function RecruiterDashboard() {
                                   <div className="flex items-center gap-2">
                                     <h3 className="font-bold">{ap.name}</h3>
                                     <div className="flex">
-                                      {Array.from({ length: 5 }).map((_, i) => (
-                                        <Star key={i} className={`w-3 h-3 ${i < ap.rating ? "text-primary fill-primary" : "text-border"}`} />
+                                      {Array.from({ length: 5 }).map((_, idx) => (
+                                        <Star key={idx} className={`w-3 h-3 ${idx < ap.rating ? "text-primary fill-primary" : "text-border"}`} />
                                       ))}
                                     </div>
+                                    {ap.experience && (
+                                      <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-full font-medium">{ap.experience}</span>
+                                    )}
                                   </div>
-                                  <p className="text-sm text-muted-foreground">{ap.title} · <span className="flex items-center gap-0.5 inline-flex"><MapPin className="w-3 h-3" />{ap.location}</span></p>
+                                  <p className="text-sm text-muted-foreground">{ap.title} · <span className="inline-flex items-center gap-0.5"><MapPin className="w-3 h-3" />{ap.location}</span></p>
                                 </div>
                                 <span className={`px-2.5 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
                               </div>
@@ -360,6 +583,14 @@ export default function RecruiterDashboard() {
                                     <ChevronRight className="w-3.5 h-3.5" /> Profile
                                   </button>
 
+                                  {/* View Resume button */}
+                                  <button
+                                    onClick={() => alert(`Resume: ${ap.name.replace(" ", "_")}_Resume.pdf`)}
+                                    className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 px-2.5 py-1.5 rounded-lg border border-blue-200 hover:border-blue-400 transition-colors bg-blue-50"
+                                  >
+                                    <FileText className="w-3.5 h-3.5" /> Resume
+                                  </button>
+
                                   {/* Stage dropdown */}
                                   <select value={ap.stage} onChange={(e) => updateStage(ap.id, e.target.value as AppStage)}
                                     className={`h-8 rounded-lg border px-2 text-xs font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring transition-all ${cfg.bg} ${cfg.color} ${cfg.border}`}
@@ -376,10 +607,15 @@ export default function RecruiterDashboard() {
                   </AnimatePresence>
 
                   {jobApplicants.length === 0 && (
-                    <div className="text-center py-16 text-muted-foreground bg-white rounded-2xl border border-border/50">
-                      <Inbox className="w-10 h-10 mx-auto mb-3 opacity-20" />
-                      <p className="font-semibold">No candidates match</p>
-                      <p className="text-sm mt-1">Try changing the stage filter or search</p>
+                    <div className="text-center py-20 text-muted-foreground bg-white rounded-2xl border border-border/50">
+                      <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
+                        <Inbox className="w-10 h-10 opacity-30" />
+                      </div>
+                      <p className="font-bold text-base">No candidates match</p>
+                      <p className="text-sm mt-1.5 max-w-xs mx-auto">Try changing the stage filter or search query to find the right candidates.</p>
+                      <button onClick={() => { setStageFilter("all"); setSearchQuery(""); }} className="mt-4 text-xs text-primary font-semibold hover:underline">
+                        Clear filters
+                      </button>
                     </div>
                   )}
                 </div>
@@ -413,7 +649,7 @@ export default function RecruiterDashboard() {
                   <div>
                     <h4 className="text-xl font-extrabold">{detailApplicant.name}</h4>
                     <p className="text-muted-foreground">{detailApplicant.title}</p>
-                    <div className="flex mt-1">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className={`w-3.5 h-3.5 ${i < detailApplicant.rating ? "text-primary fill-primary" : "text-border"}`} />)}</div>
+                    <div className="flex mt-1">{Array.from({ length: 5 }).map((_, idx) => <Star key={idx} className={`w-3.5 h-3.5 ${idx < detailApplicant.rating ? "text-primary fill-primary" : "text-border"}`} />)}</div>
                   </div>
                 </div>
 
@@ -515,13 +751,33 @@ export default function RecruiterDashboard() {
                         </select>
                       </div>
                       <div>
+                        <Label className="text-sm font-medium mb-1.5 block">Work Mode</Label>
+                        <select value={form.workMode} onChange={(e) => setForm({ ...form, workMode: e.target.value as WorkMode })} className="w-full h-10 rounded-lg border border-input bg-secondary/30 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                          <option value="onsite">On-site</option>
+                          <option value="hybrid">Hybrid</option>
+                          <option value="remote">Remote</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
                         <Label className="text-sm font-medium mb-1.5 block">Salary Range</Label>
                         <Input placeholder="e.g. $80k–$100k" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} className="bg-secondary/30" />
                       </div>
+                      <div>
+                        <Label className="text-sm font-medium mb-1.5 block">Experience Required</Label>
+                        <Input placeholder="e.g. 2-4 years" value={form.experience} onChange={(e) => setForm({ ...form, experience: e.target.value })} className="bg-secondary/30" />
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-sm font-medium mb-1.5 block">Location *</Label>
-                      <Input placeholder="e.g. San Francisco, CA" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="bg-secondary/30" required />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-sm font-medium mb-1.5 block">Location *</Label>
+                        <Input placeholder="e.g. San Francisco, CA" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="bg-secondary/30" required />
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium mb-1.5 block">Category</Label>
+                        <Input placeholder="e.g. Engineering" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="bg-secondary/30" />
+                      </div>
                     </div>
                     <div>
                       <Label className="text-sm font-medium mb-1.5 block">Skills Required</Label>
