@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,21 +12,78 @@ import MapExplorer from "@/pages/MapExplorer";
 import SeekerProfile from "@/pages/SeekerProfile";
 import AppliedJobs from "@/pages/AppliedJobs";
 import SavedJobs from "@/pages/SavedJobs";
+import { getUser } from "@/lib/api";
 
 const queryClient = new QueryClient();
+
+/** Redirects to /auth if not logged in. */
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const user = getUser();
+  if (!user) return <Redirect to="/auth" />;
+  return <>{children}</>;
+}
+
+/** Redirects to /auth if not logged in, or to home if wrong role. */
+function RequireRole({
+  role,
+  children,
+}: {
+  role: "seeker" | "recruiter";
+  children: React.ReactNode;
+}) {
+  const user = getUser();
+  if (!user) return <Redirect to="/auth" />;
+  if (user.role !== role) return <Redirect to="/" />;
+  return <>{children}</>;
+}
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/auth" component={Auth} />
-      <Route path="/users" component={Users} />
-      <Route path="/dashboard/seeker" component={SeekerDashboard} />
-      <Route path="/dashboard/recruiter" component={RecruiterDashboard} />
-      <Route path="/explore" component={MapExplorer} />
-      <Route path="/profile" component={SeekerProfile} />
-      <Route path="/applied-jobs" component={AppliedJobs} />
-      <Route path="/saved-jobs" component={SavedJobs} />
+
+      {/* Protected: seeker only */}
+      <Route path="/dashboard/seeker">
+        <RequireRole role="seeker">
+          <SeekerDashboard />
+        </RequireRole>
+      </Route>
+      <Route path="/profile">
+        <RequireRole role="seeker">
+          <SeekerProfile />
+        </RequireRole>
+      </Route>
+      <Route path="/applied-jobs">
+        <RequireRole role="seeker">
+          <AppliedJobs />
+        </RequireRole>
+      </Route>
+      <Route path="/saved-jobs">
+        <RequireRole role="seeker">
+          <SavedJobs />
+        </RequireRole>
+      </Route>
+
+      {/* Protected: recruiter only */}
+      <Route path="/dashboard/recruiter">
+        <RequireRole role="recruiter">
+          <RecruiterDashboard />
+        </RequireRole>
+      </Route>
+
+      {/* Protected: any logged-in user */}
+      <Route path="/explore">
+        <RequireAuth>
+          <MapExplorer />
+        </RequireAuth>
+      </Route>
+      <Route path="/users">
+        <RequireAuth>
+          <Users />
+        </RequireAuth>
+      </Route>
+
       <Route component={NotFound} />
     </Switch>
   );

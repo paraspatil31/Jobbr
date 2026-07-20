@@ -5,6 +5,29 @@ import { AppError } from "../middlewares/error.middleware.js";
 
 const SAFE_FIELDS = "-password";
 
+export async function getMe(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    if (!req.auth) {
+      next(new AppError(401, "Authorisation required"));
+      return;
+    }
+    const user = await UserModel.findById(req.auth.userId)
+      .select(SAFE_FIELDS)
+      .lean();
+    if (!user) {
+      next(new AppError(404, "User not found"));
+      return;
+    }
+    res.json(user);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function listUsers(
   _req: Request,
   res: Response,

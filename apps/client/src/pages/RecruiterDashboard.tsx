@@ -200,40 +200,63 @@ export default function RecruiterDashboard() {
 
   const signOut = () => { clearSession(); navigate("/"); };
 
-  const toggleActive = (id: string) =>
-    setJobs((p) => p.map((j) => j.id === id ? { ...j, active: !j.active } : j));
+  const toggleActive = (id: string) => {
+    const job = jobs.find((j) => j.id === id);
+    if (!job) return;
+    const nextActive = !job.active;
+    setJobs((p) => p.map((j) => j.id === id ? { ...j, active: nextActive } : j));
+    const token = localStorage.getItem("jn_token");
+    if (token) {
+      fetch(`/api/jobs/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ isActive: nextActive }),
+      }).catch(() => {});
+    }
+  };
 
-  const handlePost = (e: React.FormEvent) => {
+  const handlePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title || !form.location || !form.description) return;
+
+    const token = localStorage.getItem("jn_token");
+    let newId = String(Date.now());
+
+    if (token) {
+      try {
+        const res = await fetch("/api/jobs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            title: form.title,
+            company: (user as Record<string, string> | null)?.companyName ?? "My Company",
+            category: form.category,
+            type: form.type,
+            location: form.location,
+            description: form.description,
+            salary: form.salary,
+            skills: form.skills.split(",").map((s: string) => s.trim()).filter(Boolean),
+          }),
+        });
+        if (res.ok) {
+          const job = await res.json() as Record<string, unknown>;
+          newId = String(job["_id"] ?? newId);
+        }
+      } catch { /* keep local temp id */ }
+    }
+
     setJobs((p) => [{
-      id: String(Date.now()), title: form.title, type: form.type,
+      id: newId, title: form.title, type: form.type,
       location: form.location, salary: form.salary || "Negotiable",
       applicants: 0, views: 0, posted: "Just now", active: true,
     }, ...p]);
+    setSelectedJobId(newId);
     setPosted(true);
     setTimeout(() => {
       setPosted(false);
       setShowModal(false);
       setForm({ title: "", type: "full-time", location: "", salary: "", description: "", skills: "", workMode: "onsite", experience: "", category: "Engineering" });
     }, 1800);
-    const token = localStorage.getItem("jn_token");
-    if (token) {
-      fetch("/api/jobs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          title: form.title,
-          company: (user as Record<string, string> | null)?.companyName ?? "My Company",
-          category: form.category,
-          type: form.type,
-          location: form.location,
-          description: form.description,
-          salary: form.salary,
-          skills: form.skills.split(",").map((s: string) => s.trim()).filter(Boolean),
-        }),
-      }).catch(() => {});
-    }
   };
 
   const updateStage = (applicantId: string, stage: AppStage) => {
@@ -249,7 +272,13 @@ export default function RecruiterDashboard() {
     }
   };
 
-  const markAllRead = () => setNotifications((n) => n.map((x) => ({ ...x, read: true })));
+  const markAllRead = () => {
+    setNotifications((n) => n.map((x) => ({ ...x, read: true })));
+    const token = localStorage.getItem("jn_token");
+    if (token) {
+      fetch("/api/notifications/read-all", { method: "PUT", headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+    }
+  };
 
   const activeJobs = jobs.filter((j) => j.active).length;
   const totalApplicants = applicants.length;
