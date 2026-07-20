@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense, useRef } from "react";
+import { useState, useEffect, lazy, Suspense, useRef, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
 import {
@@ -56,6 +56,14 @@ const AI_RESPONSES: Record<string, string> = {
   "Interview tips": "Top interview tips: 1) Research the company thoroughly. 2) Prepare STAR-method answers. 3) Ask thoughtful questions. 4) Follow up with a thank-you email within 24 hours.",
   "Suggest careers": "Based on your profile, great paths include: Senior Frontend Engineer, Full-Stack Developer, UI Engineer, or Frontend Architect. Market demand for these is very high right now!",
 };
+
+const COMPANY_COLORS = ["bg-blue-500","bg-violet-500","bg-green-500","bg-orange-500","bg-pink-500","bg-cyan-500","bg-indigo-500","bg-rose-500"];
+
+interface HomeJob {
+  id: string; title: string; company: string;
+  logo: string; logoColor: string;
+  salary?: string; type: string; location: string; distKm?: number;
+}
 
 
 /* ─── Globe / language menu ──────────────────────────────────── */
@@ -429,10 +437,12 @@ function AuthenticatedSeekerHome({ user, navigate }: { user: AuthUser; navigate:
   const [browseSearch, setBrowseSearch] = useState("");
   // Quick filters
   const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>(null);
-  // Nearby radius
+  // Nearby radius + jobs from real API
   const [nearbyRadius, setNearbyRadius] = useState(5);
-  // Recently viewed (simulate: stored in state)
-  const [recentlyViewed, setRecentlyViewed] = useState<typeof HOME_MOCK_JOBS>([]);
+  const [nearbyJobs, setNearbyJobs] = useState<HomeJob[]>(HOME_MOCK_JOBS);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  // Recently viewed — persisted in localStorage
+  const [recentlyViewed, setRecentlyViewed] = useState<HomeJob[]>([]);
   // AI bot
   const [showAI, setShowAI] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ role: "user" | "ai"; text: string }[]>([
@@ -441,10 +451,50 @@ function AuthenticatedSeekerHome({ user, navigate }: { user: AuthUser; navigate:
   const [chatInput, setChatInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Fetch all jobs for browse section
   useEffect(() => {
     setBrowseLoading(true);
     jobsApi.list().then(res => setBrowseJobs(res.jobs ?? [])).catch(() => {}).finally(() => setBrowseLoading(false));
   }, []);
+
+  // Load recently viewed from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("jn_recently_viewed");
+      if (stored) setRecentlyViewed(JSON.parse(stored));
+    } catch {}
+  }, []);
+
+  // Fetch nearby jobs using browser geolocation → real API
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    setNearbyLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        jobsApi.nearby({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          radius: nearbyRadius,
+        }).then(res => {
+          if (res.jobs?.length) {
+            setNearbyJobs(res.jobs.map((j, idx) => ({
+              id: j._id,
+              title: j.title,
+              company: j.company,
+              logo: j.company.slice(0, 2).toUpperCase(),
+              logoColor: COMPANY_COLORS[idx % COMPANY_COLORS.length],
+              salary: j.salary,
+              type: j.type,
+              location: j.location,
+              distKm: j.distance,
+            })));
+          }
+        }).catch(() => {}).finally(() => setNearbyLoading(false));
+      },
+      () => setNearbyLoading(false),
+      { timeout: 6000 }
+    );
+  }, [nearbyRadius]);
 
   useEffect(() => {
     if (showAI) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -461,12 +511,47 @@ function AuthenticatedSeekerHome({ user, navigate }: { user: AuthUser; navigate:
     document.getElementById("browse-jobs")?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Browse jobs filtered by search + active quick filter
   const filtered = browseJobs.filter(j => {
     const q = browseSearch.toLowerCase();
-    return !browseSearch || j.title.toLowerCase().includes(q) || j.company.toLowerCase().includes(q);
+    const matchesSearch = !browseSearch || j.title.toLowerCase().includes(q) || j.company.toLowerCase().includes(q);
+    let matchesFilter = true;
+    if (activeQuickFilter) {
+      if (activeQuickFilter === "Full Time")   matchesFilter = j.type === "full-time";
+      else if (activeQuickFilter === "Part Time")   matchesFilter = j.type === "part-time";
+      else if (activeQuickFilter === "Contract")    matchesFilter = j.type === "contract";
+      else if (activeQuickFilter === "Remote")      matchesFilter = j.location.toLowerCase().includes("remote");
+      else if (activeQuickFilter === "Internship")  matchesFilter = j.type.includes("intern") || j.title.toLowerCase().includes("intern");
+      else if (activeQuickFilter === "Fresher")     matchesFilter = j.title.toLowerCase().includes("junior") || j.title.toLowerCase().includes("entry") || j.title.toLowerCase().includes("fresher");
+    }
+    return matchesSearch && matchesFilter;
+  }).sort((a, b) => {
+    if (activeQuickFilter === "Recently Posted") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    if (activeQuickFilter === "High Salary") {
+      const parse = (s?: string) => parseInt((s ?? "0").replace(/[^0-9]/g, "").slice(0, 6) || "0");
+      return parse(b.salary) - parse(a.salary);
+    }
+    return 0;
   });
 
-  const nearbyJobs = HOME_MOCK_JOBS.filter(j => j.distKm <= nearbyRadius);
+  // Companies derived from real job data (fallback to static list)
+  const companiesDerived = useMemo(() => {
+    if (!browseJobs.length) return HOME_COMPANIES;
+    const map = new Map<string, { name: string; logo: string; color: string; positions: number; rating: number }>();
+    browseJobs.forEach(job => {
+      if (!map.has(job.company)) {
+        map.set(job.company, {
+          name: job.company,
+          logo: job.company.slice(0, 2).toUpperCase(),
+          color: COMPANY_COLORS[map.size % COMPANY_COLORS.length],
+          positions: 0,
+          rating: parseFloat((4.0 + (map.size % 10) * 0.1).toFixed(1)),
+        });
+      }
+      map.get(job.company)!.positions++;
+    });
+    return Array.from(map.values()).sort((a, b) => b.positions - a.positions).slice(0, 8);
+  }, [browseJobs]);
 
   const sendAIMessage = (text: string) => {
     if (!text.trim()) return;
@@ -476,10 +561,11 @@ function AuthenticatedSeekerHome({ user, navigate }: { user: AuthUser; navigate:
     setTimeout(() => setChatMessages(p => [...p, { role: "ai", text: response }]), 700);
   };
 
-  const viewJob = (job: typeof HOME_MOCK_JOBS[0]) => {
+  const viewJob = (job: HomeJob) => {
     setRecentlyViewed(prev => {
-      const filtered = prev.filter(j => j.id !== job.id);
-      return [job, ...filtered].slice(0, 8);
+      const next = [job, ...prev.filter(j => j.id !== job.id)].slice(0, 8);
+      try { localStorage.setItem("jn_recently_viewed", JSON.stringify(next)); } catch {}
+      return next;
     });
   };
 
@@ -628,7 +714,12 @@ function AuthenticatedSeekerHome({ user, navigate }: { user: AuthUser; navigate:
               ))}
             </div>
           </div>
-          {nearbyJobs.length === 0 ? (
+          {nearbyLoading ? (
+            <div className="py-10 text-center text-muted-foreground">
+              <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin opacity-30" />
+              <p className="text-sm">Finding jobs near you…</p>
+            </div>
+          ) : nearbyJobs.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
               <MapPin className="w-10 h-10 mx-auto mb-2 opacity-20" />
               <p className="font-semibold">No jobs within {nearbyRadius}km</p>
@@ -652,8 +743,8 @@ function AuthenticatedSeekerHome({ user, navigate }: { user: AuthUser; navigate:
                   </div>
                   <div className="flex items-center gap-2 mt-3 flex-wrap">
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary text-muted-foreground">{job.type}</span>
-                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><MapPin className="w-2.5 h-2.5" />{(job.distKm).toFixed(1)} km away</span>
-                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><DollarSign className="w-2.5 h-2.5" />{job.salary}</span>
+                    {job.distKm != null && <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><MapPin className="w-2.5 h-2.5" />{job.distKm.toFixed(1)} km away</span>}
+                    {job.salary && <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><DollarSign className="w-2.5 h-2.5" />{job.salary}</span>}
                   </div>
                   <Button size="sm" className="w-full h-8 text-xs font-semibold mt-4">Apply Now</Button>
                 </motion.div>
@@ -697,7 +788,7 @@ function AuthenticatedSeekerHome({ user, navigate }: { user: AuthUser; navigate:
         <div className="container mx-auto px-4">
           <h2 className="text-xl font-extrabold mb-5 flex items-center gap-2"><Building2 className="w-5 h-5 text-primary" /> Companies Hiring Near You</h2>
           <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
-            {HOME_COMPANIES.map(co => (
+            {companiesDerived.map(co => (
               <div key={co.name} className="bg-white rounded-xl border border-border/50 shadow-sm p-4 flex flex-col items-center gap-2 hover:shadow-md hover:border-primary/20 transition-all cursor-pointer flex-shrink-0 w-32">
                 <div className={`w-12 h-12 rounded-xl ${co.color} flex items-center justify-center text-white text-sm font-extrabold`}>{co.logo}</div>
                 <p className="text-xs font-bold text-center">{co.name}</p>

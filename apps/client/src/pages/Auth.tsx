@@ -183,6 +183,7 @@ export default function Auth() {
       const t = setTimeout(() => navigate(dest), 2200);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [step, navigate, role]);
 
   return (
@@ -479,7 +480,7 @@ export default function Auth() {
                             {...signUpSeekerForm.register(field as "fullName" | "email" | "location")}
                             data-testid={testId} className="bg-white/60"
                           />
-                          <FieldError message={signUpSeekerForm.formState.errors[field as keyof typeof signUpSeekerSchema.shape]?.message} />
+                          <FieldError message={(signUpSeekerForm.formState.errors as Record<string, { message?: string } | undefined>)[field]?.message} />
                         </motion.div>
                       ))}
                       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
@@ -515,7 +516,7 @@ export default function Auth() {
                             {...signUpRecruiterForm.register(field as "companyName" | "fullName" | "email" | "location")}
                             data-testid={testId} className="bg-white/60"
                           />
-                          <FieldError message={signUpRecruiterForm.formState.errors[field as keyof typeof signUpRecruiterSchema.shape]?.message} />
+                          <FieldError message={(signUpRecruiterForm.formState.errors as Record<string, { message?: string } | undefined>)[field]?.message} />
                         </motion.div>
                       ))}
                       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
