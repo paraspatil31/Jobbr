@@ -6,6 +6,7 @@ import {
   LogOut, Bell, Bookmark, FileText, Settings2, Users,
   Zap, Shield, Target, Twitter, Linkedin, Github, Loader2,
   Building2, UserCircle, DollarSign, Filter, X,
+  Bot, Send, Star, Clock, Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -24,9 +25,38 @@ const PUBLIC_NAV = [
 ];
 const SEEKER_NAV = [
   { label: "Home", href: "/" },
-  { label: "Browse Jobs", href: "/explore" },
 ];
 const LANGUAGES = ["EN", "FR", "ES", "DE", "AR"];
+
+/* ─── Home page constants ─────────────────────────────────────── */
+const QUICK_FILTERS = ["Full Time", "Part Time", "Internship", "Remote", "Fresher", "Nearby", "High Salary", "Recently Posted"];
+
+const HOME_MOCK_JOBS = [
+  { id: "h1", title: "Frontend Developer",   company: "TechHub SF",   type: "Full-time", location: "San Francisco, CA", salary: "$90k–$120k",  distKm: 1.5,  logo: "TH", logoColor: "bg-blue-500" },
+  { id: "h2", title: "UX Designer",          company: "DesignCo",     type: "Contract",  location: "San Francisco, CA", salary: "$75k–$95k",   distKm: 2.1,  logo: "DC", logoColor: "bg-purple-500" },
+  { id: "h3", title: "Product Manager",      company: "GrowthLabs",   type: "Full-time", location: "Oakland, CA",       salary: "$110k–$140k", distKm: 3.8,  logo: "GL", logoColor: "bg-green-500" },
+  { id: "h4", title: "Backend Engineer",     company: "DataStream",   type: "Part-time", location: "San Francisco, CA", salary: "$70k–$90k",   distKm: 4.9,  logo: "DS", logoColor: "bg-orange-500" },
+  { id: "h5", title: "Marketing Specialist", company: "BrandForward", type: "Full-time", location: "San Francisco, CA", salary: "$60k–$80k",   distKm: 7.2,  logo: "BF", logoColor: "bg-pink-500" },
+  { id: "h6", title: "DevOps Engineer",      company: "CloudBase",    type: "Contract",  location: "Remote / SF",       salary: "$100k–$130k", distKm: 9.5,  logo: "CB", logoColor: "bg-cyan-500" },
+];
+
+const HOME_COMPANIES = [
+  { name: "Google",   logo: "Go", color: "bg-blue-500",   positions: 42, rating: 4.8 },
+  { name: "Stripe",   logo: "St", color: "bg-violet-500", positions: 18, rating: 4.6 },
+  { name: "Figma",    logo: "Fi", color: "bg-pink-500",   positions: 11, rating: 4.5 },
+  { name: "Vercel",   logo: "Ve", color: "bg-slate-800",  positions: 7,  rating: 4.7 },
+  { name: "Notion",   logo: "No", color: "bg-gray-700",   positions: 9,  rating: 4.4 },
+  { name: "Linear",   logo: "Li", color: "bg-indigo-500", positions: 5,  rating: 4.9 },
+  { name: "Supabase", logo: "Su", color: "bg-green-500",  positions: 14, rating: 4.6 },
+];
+
+const AI_RESPONSES: Record<string, string> = {
+  "Find jobs near me": "I found 5 jobs near you! Top picks: Frontend Developer at TechHub SF (1.5km) and UX Designer at DesignCo (2.1km). Scroll down to browse them!",
+  "Improve my resume": "3 quick tips: 1) Add quantifiable achievements (e.g. 'Increased performance by 40%'). 2) Include keywords from job descriptions. 3) Add a skills section with your top 6-8 technical skills.",
+  "Interview tips": "Top interview tips: 1) Research the company thoroughly. 2) Prepare STAR-method answers. 3) Ask thoughtful questions. 4) Follow up with a thank-you email within 24 hours.",
+  "Suggest careers": "Based on your profile, great paths include: Senior Frontend Engineer, Full-Stack Developer, UI Engineer, or Frontend Architect. Market demand for these is very high right now!",
+};
+
 
 /* ─── Globe / language menu ──────────────────────────────────── */
 function GlobeMenu({ lang, setLang }: { lang: string; setLang: (l: string) => void }) {
@@ -397,11 +427,28 @@ function AuthenticatedSeekerHome({ user, navigate }: { user: AuthUser; navigate:
   const [browseJobs, setBrowseJobs] = useState<ApiJob[]>([]);
   const [browseLoading, setBrowseLoading] = useState(false);
   const [browseSearch, setBrowseSearch] = useState("");
+  // Quick filters
+  const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>(null);
+  // Nearby radius
+  const [nearbyRadius, setNearbyRadius] = useState(5);
+  // Recently viewed (simulate: stored in state)
+  const [recentlyViewed, setRecentlyViewed] = useState<typeof HOME_MOCK_JOBS>([]);
+  // AI bot
+  const [showAI, setShowAI] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ role: "user" | "ai"; text: string }[]>([
+    { role: "ai", text: "Hi! I'm your AI Career Assistant. Ask me to find jobs, improve your resume, or prep for interviews! 🚀" },
+  ]);
+  const [chatInput, setChatInput] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setBrowseLoading(true);
     jobsApi.list().then(res => setBrowseJobs(res.jobs ?? [])).catch(() => {}).finally(() => setBrowseLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (showAI) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, showAI]);
 
   const handleSearch = (jobQ: string, locQ: string) => {
     const p = new URLSearchParams();
@@ -410,13 +457,81 @@ function AuthenticatedSeekerHome({ user, navigate }: { user: AuthUser; navigate:
     navigate(`/explore?${p.toString()}`);
   };
 
+  const scrollToBrowse = () => {
+    document.getElementById("browse-jobs")?.scrollIntoView({ behavior: "smooth" });
+  };
+
   const filtered = browseJobs.filter(j => {
     const q = browseSearch.toLowerCase();
     return !browseSearch || j.title.toLowerCase().includes(q) || j.company.toLowerCase().includes(q);
   });
 
+  const nearbyJobs = HOME_MOCK_JOBS.filter(j => j.distKm <= nearbyRadius);
+
+  const sendAIMessage = (text: string) => {
+    if (!text.trim()) return;
+    setChatMessages(p => [...p, { role: "user", text }]);
+    setChatInput("");
+    const response = AI_RESPONSES[text] ?? "Great question! I'm analyzing your profile and will have personalized recommendations shortly. Meanwhile, scroll down to browse recommended jobs!";
+    setTimeout(() => setChatMessages(p => [...p, { role: "ai", text: response }]), 700);
+  };
+
+  const viewJob = (job: typeof HOME_MOCK_JOBS[0]) => {
+    setRecentlyViewed(prev => {
+      const filtered = prev.filter(j => j.id !== job.id);
+      return [job, ...filtered].slice(0, 8);
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
+
+      {/* ── AI Floating Button ── */}
+      <button onClick={() => setShowAI(p => !p)}
+        className="fixed bottom-6 right-6 z-[60] w-14 h-14 rounded-full bg-primary text-white shadow-2xl flex items-center justify-center hover:scale-110 transition-transform">
+        <Bot className="w-6 h-6" />
+      </button>
+
+      {/* ── AI Chat Panel ── */}
+      <AnimatePresence>
+        {showAI && (
+          <motion.div initial={{ y: "100%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: "100%", opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed right-6 bottom-0 w-80 md:w-96 rounded-t-2xl shadow-2xl bg-white z-[60] flex flex-col overflow-hidden border border-border/60"
+            style={{ maxHeight: "70vh" }}>
+            <div className="flex items-center justify-between px-4 py-3 bg-primary text-white rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center gap-2"><Bot className="w-5 h-5" /><span className="font-extrabold text-sm">AI Career Assistant</span></div>
+              <button onClick={() => setShowAI(false)} className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {chatMessages.map((m, i) => (
+                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                  {m.role === "ai" && <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5"><Bot className="w-4 h-4 text-primary" /></div>}
+                  <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-snug ${m.role === "user" ? "bg-primary text-white rounded-br-md" : "bg-secondary text-foreground rounded-bl-md"}`}>
+                    {m.text}
+                  </div>
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+            <div className="px-3 py-2 border-t border-border/40 flex-shrink-0">
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {Object.keys(AI_RESPONSES).map(chip => (
+                  <button key={chip} onClick={() => sendAIMessage(chip)}
+                    className="px-2.5 py-1 rounded-full bg-primary/8 text-primary text-xs font-medium border border-primary/20 hover:bg-primary/15 transition-colors">
+                    {chip}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendAIMessage(chatInput)}
+                  placeholder="Ask me anything…" className="flex-1 h-9 text-sm bg-secondary/30 border-border/60" />
+                <Button size="sm" onClick={() => sendAIMessage(chatInput)} className="h-9 w-9 p-0 rounded-xl"><Send className="w-4 h-4" /></Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Navbar */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-border/40 shadow-sm">
@@ -429,6 +544,9 @@ function AuthenticatedSeekerHome({ user, navigate }: { user: AuthUser; navigate:
             {SEEKER_NAV.map(({ label, href }) => (
               <Link key={label} href={href} className="text-muted-foreground hover:text-foreground transition-colors">{label}</Link>
             ))}
+            <button onClick={scrollToBrowse} className="text-muted-foreground hover:text-foreground transition-colors font-medium">
+              Browse Jobs
+            </button>
           </nav>
           <div className="flex items-center gap-2">
             <GlobeMenu lang={lang} setLang={setLang} />
@@ -481,12 +599,122 @@ function AuthenticatedSeekerHome({ user, navigate }: { user: AuthUser; navigate:
         </div>
       </section>
 
-      {/* Browse Jobs section */}
-      <section className="py-16 bg-background">
+      {/* ── Quick Filters (below map) ── */}
+      <section className="pt-12 pb-4 bg-background">
+        <div className="container mx-auto px-4">
+          <h2 className="text-lg font-extrabold mb-4 flex items-center gap-2"><Filter className="w-4 h-4 text-primary" /> Quick Filters</h2>
+          <div className="flex flex-wrap gap-2">
+            {QUICK_FILTERS.map(f => (
+              <button key={f} onClick={() => setActiveQuickFilter(activeQuickFilter === f ? null : f)}
+                className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${activeQuickFilter === f ? "bg-primary text-white border-primary shadow-sm" : "bg-white text-muted-foreground border-border/60 hover:border-primary/40 hover:text-foreground"}`}>
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Jobs Near You (below map) ── */}
+      <section className="py-10 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+            <h2 className="text-xl font-extrabold flex items-center gap-2"><MapPin className="w-5 h-5 text-primary" /> Jobs Near You</h2>
+            <div className="flex gap-1">
+              {[2, 5, 10].map(km => (
+                <button key={km} onClick={() => setNearbyRadius(km)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${nearbyRadius === km ? "bg-primary text-white border-primary" : "bg-white border-border/60 text-muted-foreground hover:border-primary/40"}`}>
+                  {km} km
+                </button>
+              ))}
+            </div>
+          </div>
+          {nearbyJobs.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <MapPin className="w-10 h-10 mx-auto mb-2 opacity-20" />
+              <p className="font-semibold">No jobs within {nearbyRadius}km</p>
+              <p className="text-sm mt-1">Try increasing the radius</p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {nearbyJobs.map((job, i) => (
+                <motion.div key={job.id} initial={{ y: 20, opacity: 0 }} whileInView={{ y: 0, opacity: 1 }}
+                  viewport={{ once: true }} transition={{ delay: i * 0.05 }}
+                  onClick={() => viewJob(job)}
+                  className="bg-white border border-border/50 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer group">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-xl ${job.logoColor} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
+                      {job.logo}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm group-hover:text-primary transition-colors truncate">{job.title}</p>
+                      <p className="text-xs text-muted-foreground">{job.company}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3 flex-wrap">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary text-muted-foreground">{job.type}</span>
+                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><MapPin className="w-2.5 h-2.5" />{(job.distKm).toFixed(1)} km away</span>
+                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><DollarSign className="w-2.5 h-2.5" />{job.salary}</span>
+                  </div>
+                  <Button size="sm" className="w-full h-8 text-xs font-semibold mt-4">Apply Now</Button>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── Recently Viewed (below map) ── */}
+      <section className="py-10 bg-background">
+        <div className="container mx-auto px-4">
+          <h2 className="text-xl font-extrabold mb-5 flex items-center gap-2"><Clock className="w-5 h-5 text-primary" /> Recently Viewed</h2>
+          {recentlyViewed.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-border/50 shadow-sm py-12 text-center text-muted-foreground">
+              <Clock className="w-10 h-10 mx-auto mb-3 opacity-20" />
+              <p className="font-semibold">No recently viewed jobs</p>
+              <p className="text-sm mt-1">Click on any job card to track your history here</p>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {recentlyViewed.map(job => (
+                <div key={job.id} className="bg-white rounded-xl border border-border/50 shadow-sm p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`w-9 h-9 rounded-lg ${job.logoColor} flex items-center justify-center text-white text-xs font-extrabold flex-shrink-0`}>{job.logo}</div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold truncate">{job.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{job.company}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> Just now</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── Companies Hiring Near You (below map) ── */}
+      <section className="py-10 bg-background">
+        <div className="container mx-auto px-4">
+          <h2 className="text-xl font-extrabold mb-5 flex items-center gap-2"><Building2 className="w-5 h-5 text-primary" /> Companies Hiring Near You</h2>
+          <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+            {HOME_COMPANIES.map(co => (
+              <div key={co.name} className="bg-white rounded-xl border border-border/50 shadow-sm p-4 flex flex-col items-center gap-2 hover:shadow-md hover:border-primary/20 transition-all cursor-pointer flex-shrink-0 w-32">
+                <div className={`w-12 h-12 rounded-xl ${co.color} flex items-center justify-center text-white text-sm font-extrabold`}>{co.logo}</div>
+                <p className="text-xs font-bold text-center">{co.name}</p>
+                <p className="text-xs text-muted-foreground">{co.positions} open</p>
+                <div className="flex items-center gap-1"><Star className="w-3 h-3 text-amber-400 fill-amber-400" /><span className="text-xs text-muted-foreground">{co.rating}</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Browse Jobs section ── */}
+      <section id="browse-jobs" className="py-16 bg-background">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
             <div>
-              <h2 className="text-2xl font-extrabold tracking-tight">Browse Jobs</h2>
+              <h2 className="text-2xl font-extrabold tracking-tight flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> Browse Jobs</h2>
               <p className="text-muted-foreground text-sm mt-1">All available listings</p>
             </div>
             <div className="relative">
