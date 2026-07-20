@@ -885,26 +885,6 @@ export default function SeekerDashboard() {
           {tab === "overview" && (
             <motion.div key="overview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="space-y-8">
 
-              {/* Stats Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { icon: Briefcase,    label: "Applied Jobs",   value: dashStats.appliedJobs  || applications.length,        growth: "+2 this week", color: "text-blue-600",   bg: "bg-blue-50" },
-                  { icon: Bookmark,     label: "Saved Jobs",     value: dashStats.savedJobs    || saved.size,                  growth: "+1 this week", color: "text-violet-600", bg: "bg-violet-50" },
-                  { icon: CalendarClock,label: "Interviews",     value: dashStats.interviews   || (appCounts["interview"] ?? 0),growth: "+1 this week", color: "text-amber-600",  bg: "bg-amber-50" },
-                  { icon: Eye,          label: "Profile Views",  value: dashStats.profileViews || 12,                          growth: "+3 this week", color: "text-green-600",  bg: "bg-green-50" },
-                ].map(({ icon: Icon, label, value, growth, color, bg }) => (
-                  <div key={label} className="bg-white rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-shadow p-5">
-                    <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center mb-3`}><Icon className={`w-5 h-5 ${color}`} /></div>
-                    <p className="text-3xl font-extrabold">{value}</p>
-                    <p className="text-sm text-muted-foreground mt-0.5 font-medium">{label}</p>
-                    <p className="text-xs text-green-600 font-semibold mt-1">{growth}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Profile Completion */}
-              <ProfileCompletion />
-
               {/* Quick Filters */}
               <div>
                 <h3 className="font-extrabold mb-3 flex items-center gap-2"><Filter className="w-4 h-4 text-primary" /> Quick Filters</h3>
