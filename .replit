@@ -18,15 +18,11 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Dev"
-
-[[workflows.workflow]]
-name = "Dev"
-author = "agent"
+args = "apps/client: web"
 
 [[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm dev"
+task = "workflow.run"
+args = "apps/server: API Server"
 
 [agent]
 stack = "PNPM_WORKSPACE"
@@ -35,10 +31,6 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
-
-[[ports]]
-localPort = 5173
-externalPort = 80
 
 [[ports]]
 localPort = 8080
