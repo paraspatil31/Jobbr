@@ -299,7 +299,7 @@ export default function SeekerDashboard() {
   const [search, setSearch] = useState("");
   const [activeType, setActiveType] = useState("all");
   const [saved, setSaved] = useState<Set<string>>(new Set());
-  const [applications, setApplications] = useState<Application[]>(INITIAL_APPLICATIONS);
+  const [applications, setApplications] = useState<Application[]>([]);
   const [statusFilter, setStatusFilter] = useState<AppStatus | "all">("all");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>(null);

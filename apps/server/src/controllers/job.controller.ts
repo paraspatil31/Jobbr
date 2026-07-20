@@ -3,6 +3,22 @@ import type { PipelineStage } from "mongoose";
 import { JobModel } from "../models/index.js";
 import { AppError } from "../middlewares/error.middleware.js";
 
+/** Geocode a free-text location string via Nominatim (no API key needed). */
+async function geocodeLocation(location: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&limit=1`;
+    const res = await fetch(url, {
+      headers: { "Accept-Language": "en", "User-Agent": "JobNearby/1.0" },
+      signal: AbortSignal.timeout(6000),
+    });
+    const json = await res.json() as Array<{ lat: string; lon: string }>;
+    if (!json.length) return null;
+    return { lat: parseFloat(json[0]!.lat), lng: parseFloat(json[0]!.lon) };
+  } catch {
+    return null;
+  }
+}
+
 export async function listJobs(
   req: Request,
   res: Response,
@@ -216,6 +232,22 @@ export async function createJob(
     const job = await JobModel.create(jobData);
 
     res.status(201).json(job);
+
+    // Background geocode the location text if coordinates weren't provided
+    if (!jobData["geoLocation"] && location) {
+      geocodeLocation(location).then((coords) => {
+        if (coords) {
+          JobModel.updateOne(
+            { _id: job._id },
+            {
+              latitude: coords.lat,
+              longitude: coords.lng,
+              geoLocation: { type: "Point", coordinates: [coords.lng, coords.lat] },
+            }
+          ).catch(() => {});
+        }
+      }).catch(() => {});
+    }
   } catch (err) {
     next(err);
   }

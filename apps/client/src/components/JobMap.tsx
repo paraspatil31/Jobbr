@@ -95,12 +95,22 @@ export default function JobMap({ radius = 25, onCategoriesChange }: JobMapProps)
       .then((r) => r.json())
       .then((data: { jobs?: Array<Record<string, unknown>>; categories?: Array<{ name: string; count: number }> }) => {
         const pins: JobPin[] = (data.jobs ?? [])
-          .filter((j) => {
-            const geo = j["geoLocation"] as { coordinates?: [number, number] } | undefined;
-            return geo?.coordinates && geo.coordinates.length === 2;
-          })
           .map((j) => {
-            const geo = j["geoLocation"] as { coordinates: [number, number] };
+            // Prefer geoLocation, fall back to flat latitude/longitude fields
+            const geo = j["geoLocation"] as { coordinates?: [number, number] } | undefined;
+            let jobLat: number | null = null;
+            let jobLng: number | null = null;
+
+            if (geo?.coordinates && geo.coordinates.length === 2) {
+              jobLng = geo.coordinates[0]!;
+              jobLat = geo.coordinates[1]!;
+            } else if (typeof j["latitude"] === "number" && typeof j["longitude"] === "number") {
+              jobLat = j["latitude"] as number;
+              jobLng = j["longitude"] as number;
+            }
+
+            if (jobLat === null || jobLng === null || (jobLat === 0 && jobLng === 0)) return null;
+
             const cat = String(j["category"] ?? "General");
             return {
               id: String(j["_id"]),
@@ -109,11 +119,12 @@ export default function JobMap({ radius = 25, onCategoriesChange }: JobMapProps)
               category: cat,
               type: String(j["type"] ?? ""),
               salary: String(j["salary"] ?? ""),
-              lat: geo.coordinates[1],
-              lng: geo.coordinates[0],
+              lat: jobLat,
+              lng: jobLng,
               color: categoryColor(cat),
-            };
-          });
+            } satisfies JobPin;
+          })
+          .filter((p): p is JobPin => p !== null);
 
         setJobs(pins);
 
