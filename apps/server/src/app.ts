@@ -9,6 +9,9 @@ import { errorMiddleware } from "./middlewares/error.middleware.js";
 
 const app: Express = express();
 
+/* ── Trust proxy (Replit reverse-proxy sets X-Forwarded-For) ── */
+app.set("trust proxy", 1);
+
 /* ── Security headers ────────────────────────────────────────── */
 app.use(
   helmet({
@@ -21,6 +24,7 @@ app.use(
 const allowedOrigins = [
   /\.replit\.dev$/,
   /\.replit\.app$/,
+  /\.repl\.co$/,
   /localhost/,
   /127\.0\.0\.1/,
 ];
