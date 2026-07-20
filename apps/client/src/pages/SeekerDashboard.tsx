@@ -1321,6 +1321,49 @@ export default function SeekerDashboard() {
           {tab === "profile" && (
             <motion.div key="profile" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="space-y-6">
 
+              {/* ── Welcome banner ── */}
+              <div className="bg-gradient-to-r from-primary/90 to-yellow-400 rounded-2xl p-6 flex items-center justify-between overflow-hidden relative">
+                <div className="absolute right-0 top-0 w-48 h-48 rounded-full bg-white/10 -translate-y-1/2 translate-x-1/4" />
+                <div className="absolute right-24 bottom-0 w-24 h-24 rounded-full bg-white/10 translate-y-1/2" />
+                <div className="relative">
+                  <p className="text-yellow-900/70 text-sm font-medium mb-1">Good morning</p>
+                  <h1 className="text-2xl font-extrabold text-yellow-950">Hi, {user?.fullName?.split(" ")[0] ?? "there"}!</h1>
+                  <p className="text-yellow-900/70 text-sm mt-1">
+                    {applications.filter(a => a.status !== "rejected").length} active application{applications.filter(a => a.status !== "rejected").length !== 1 ? "s" : ""} · {unreadCount > 0 ? `${unreadCount} new alert${unreadCount !== 1 ? "s" : ""}` : "all caught up"}
+                  </p>
+                </div>
+                <div className="relative hidden md:flex items-center gap-6 text-yellow-950">
+                  {[
+                    { icon: Briefcase,   label: "Jobs nearby",   value: "24" },
+                    { icon: TrendingUp,  label: "Applications",  value: String(applications.length) },
+                    { icon: Radar,       label: "Alerts active", value: alertSettings.enabled ? "On" : "Off" },
+                  ].map(({ icon: Icon, label, value }) => (
+                    <div key={label} className="text-center">
+                      <div className="w-10 h-10 rounded-xl bg-white/25 flex items-center justify-center mx-auto mb-1"><Icon className="w-5 h-5" /></div>
+                      <p className="text-xl font-extrabold leading-none">{value}</p>
+                      <p className="text-xs text-yellow-900/60 mt-0.5">{label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Stats Cards ── */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { icon: Briefcase,     label: "Applied Jobs",  value: dashStats.appliedJobs  || applications.length,              growth: "+2 this week", color: "text-blue-600",   bg: "bg-blue-50" },
+                  { icon: Bookmark,      label: "Saved Jobs",    value: dashStats.savedJobs    || saved.size,                        growth: "+1 this week", color: "text-violet-600", bg: "bg-violet-50" },
+                  { icon: CalendarClock, label: "Interviews",    value: dashStats.interviews   || (appCounts["interview"] ?? 0),     growth: "+1 this week", color: "text-amber-600",  bg: "bg-amber-50" },
+                  { icon: Eye,           label: "Profile Views", value: dashStats.profileViews || 12,                                growth: "+3 this week", color: "text-green-600",  bg: "bg-green-50" },
+                ].map(({ icon: Icon, label, value, growth, color, bg }) => (
+                  <div key={label} className="bg-white rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-shadow p-5">
+                    <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center mb-3`}><Icon className={`w-5 h-5 ${color}`} /></div>
+                    <p className="text-3xl font-extrabold">{value}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5 font-medium">{label}</p>
+                    <p className="text-xs text-green-600 font-semibold mt-1">{growth}</p>
+                  </div>
+                ))}
+              </div>
+
               {/* Resume card */}
               <div className="bg-white rounded-2xl border border-border/50 shadow-sm p-6">
                 <h3 className="font-extrabold mb-4 flex items-center gap-2"><FileText className="w-4 h-4 text-primary" /> My Resume</h3>
