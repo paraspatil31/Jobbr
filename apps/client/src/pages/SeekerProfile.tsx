@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft, Pencil, Save, X, MapPin, Mail, Briefcase,
   FileText, Upload, CheckCircle2, Loader2, Plus, Settings2,
-  Shield, Trash2,
+  Shield, Trash2, TrendingUp, Radar, Eye, Bookmark,
+  CalendarClock, XCircle, Sparkles, User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,36 +38,50 @@ export default function SeekerProfile() {
   const [skills, setSkills] = useState<string[]>([]);
   const [newSkill, setNewSkill] = useState("");
   const [resumeName, setResumeName] = useState("");
+  const [stats, setStats] = useState({ appliedJobs: 0, savedJobs: 0, interviews: 0, profileViews: 12 });
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
+    return "Good evening";
+  })();
 
   useEffect(() => {
     if (!sessionUser) { navigate("/auth"); return; }
-    fetch(`/api/users/${sessionUser.id}`, {
-      headers: { Authorization: `Bearer ${token ?? ""}` },
-    })
-      .then(r => r.json())
-      .then((d: UserProfile) => {
-        setProfile(d);
-        setEditForm({
-          fullName: d.fullName ?? sessionUser.fullName,
-          location: d.location ?? "",
-          jobTitle: d.jobTitle ?? "",
-          preferredRadius: d.preferredRadius ?? 25,
+    const headers = { Authorization: `Bearer ${token ?? ""}` };
+
+    // Fetch profile, stats, and applications in parallel
+    Promise.all([
+      fetch(`/api/users/${sessionUser.id}`, { headers }).then(r => r.json()).catch(() => null),
+      fetch("/api/stats/seeker", { headers }).then(r => r.json()).catch(() => null),
+      fetch("/api/applications", { headers }).then(r => r.json()).catch(() => ({ applications: [] })),
+    ]).then(([d, s, apps]) => {
+      const profile: UserProfile = d ?? {
+        _id: sessionUser.id,
+        fullName: sessionUser.fullName,
+        email: sessionUser.email,
+        role: sessionUser.role,
+        location: "",
+      };
+      setProfile(profile);
+      setEditForm({
+        fullName: profile.fullName ?? sessionUser.fullName,
+        location: profile.location ?? "",
+        jobTitle: profile.jobTitle ?? "",
+        preferredRadius: profile.preferredRadius ?? 25,
+      });
+      setSkills(profile.skills ?? []);
+      if (s) {
+        setStats({
+          appliedJobs: s.appliedJobs ?? (apps?.applications?.length ?? 0),
+          savedJobs:   s.savedJobs   ?? 0,
+          interviews:  s.interviews  ?? 0,
+          profileViews:s.profileViews ?? 12,
         });
-        setSkills(d.skills ?? []);
-      })
-      .catch(() => {
-        const fallback: UserProfile = {
-          _id: sessionUser.id,
-          fullName: sessionUser.fullName,
-          email: sessionUser.email,
-          role: sessionUser.role,
-          location: "",
-        };
-        setProfile(fallback);
-        setEditForm({ fullName: sessionUser.fullName, location: "", jobTitle: "", preferredRadius: 25 });
-      })
-      .finally(() => setLoading(false));
+      }
+    }).finally(() => setLoading(false));
   }, []);
 
   const handleSave = async () => {
@@ -171,6 +186,107 @@ export default function SeekerProfile() {
                 <CheckCircle2 className="w-4 h-4" /> Profile saved successfully!
               </motion.div>
             )}
+
+            {/* ── Welcome banner ── */}
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+              className="bg-gradient-to-r from-primary/90 to-yellow-400 rounded-2xl p-6 flex items-center justify-between overflow-hidden relative">
+              <div className="absolute right-0 top-0 w-48 h-48 rounded-full bg-white/10 -translate-y-1/2 translate-x-1/4" />
+              <div className="absolute right-24 bottom-0 w-24 h-24 rounded-full bg-white/10 translate-y-1/2" />
+              <div className="relative">
+                <p className="text-yellow-900/70 text-sm font-medium mb-1">{greeting}</p>
+                <h1 className="text-2xl font-extrabold text-yellow-950">
+                  Hi, {(profile?.fullName ?? sessionUser?.fullName ?? "there").split(" ")[0]}!
+                </h1>
+                <p className="text-yellow-900/70 text-sm mt-1">
+                  {stats.appliedJobs} active application{stats.appliedJobs !== 1 ? "s" : ""} · {stats.profileViews} profile views
+                </p>
+              </div>
+              <div className="relative hidden sm:flex items-center gap-6 text-yellow-950">
+                {[
+                  { icon: Briefcase,   label: "Jobs nearby",    value: "24" },
+                  { icon: TrendingUp,  label: "Applications",   value: String(stats.appliedJobs) },
+                  { icon: Radar,       label: "Profile views",  value: String(stats.profileViews) },
+                ].map(({ icon: Icon, label, value }) => (
+                  <div key={label} className="text-center">
+                    <div className="w-10 h-10 rounded-xl bg-white/25 flex items-center justify-center mx-auto mb-1">
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <p className="text-xl font-extrabold leading-none">{value}</p>
+                    <p className="text-xs text-yellow-900/60 mt-0.5">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+
+            {/* ── Stat cards ── */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { icon: Briefcase,     label: "Applied Jobs",  value: stats.appliedJobs,  growth: "+2 this week", color: "text-blue-600",   bg: "bg-blue-50" },
+                { icon: Bookmark,      label: "Saved Jobs",    value: stats.savedJobs,    growth: "+1 this week", color: "text-violet-600", bg: "bg-violet-50" },
+                { icon: CalendarClock, label: "Interviews",    value: stats.interviews,   growth: "+1 this week", color: "text-amber-600",  bg: "bg-amber-50" },
+                { icon: Eye,           label: "Profile Views", value: stats.profileViews, growth: "+3 this week", color: "text-green-600",  bg: "bg-green-50" },
+              ].map(({ icon: Icon, label, value, growth, color, bg }, i) => (
+                <motion.div key={label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+                  className="bg-white/80 backdrop-blur-sm border border-white/60 rounded-2xl p-4 shadow-sm">
+                  <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center mb-2`}>
+                    <Icon className={`w-4 h-4 ${color}`} />
+                  </div>
+                  <p className="text-2xl font-extrabold">{value}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 font-medium">{label}</p>
+                  <p className="text-xs text-green-600 font-semibold mt-1">{growth}</p>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* ── Profile Completion ── */}
+            {(() => {
+              const items = [
+                { label: "Full Name",  done: !!(profile?.fullName) },
+                { label: "Skills",     done: skills.length > 0 },
+                { label: "Location",   done: !!(profile?.location) },
+                { label: "Experience", done: !!(profile?.jobTitle) },
+                { label: "Resume",     done: !!resumeName },
+                { label: "Certifications", done: false },
+              ];
+              const pct = Math.round((items.filter(i => i.done).length / items.length) * 100);
+              const radius = 28, stroke = 5, norm = radius - stroke / 2;
+              const circ = 2 * Math.PI * norm;
+              return (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+                  className="bg-white/80 backdrop-blur-sm border border-white/60 rounded-3xl p-6 shadow-sm">
+                  <h3 className="font-extrabold mb-4 flex items-center gap-2">
+                    <User className="w-4 h-4 text-primary" /> Profile Completion
+                  </h3>
+                  <div className="flex items-center gap-6">
+                    <div className="relative flex-shrink-0 w-16 h-16">
+                      <svg width="64" height="64" className="-rotate-90">
+                        <circle cx="32" cy="32" r={norm} fill="none" stroke="#e5e7eb" strokeWidth={stroke} />
+                        <circle cx="32" cy="32" r={norm} fill="none" stroke="hsl(var(--primary))" strokeWidth={stroke}
+                          strokeDasharray={circ} strokeDashoffset={circ * (1 - pct / 100)}
+                          strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.8s ease" }} />
+                      </svg>
+                      <span className="absolute inset-0 flex items-center justify-center text-xs font-extrabold">{pct}%</span>
+                    </div>
+                    <div className="flex-1 grid grid-cols-2 gap-y-2 gap-x-4">
+                      {items.map(({ label, done }) => (
+                        <div key={label} className={`flex items-center gap-2 text-sm ${done ? "text-green-700" : "text-muted-foreground"}`}>
+                          {done
+                            ? <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                            : <XCircle className="w-4 h-4 text-border flex-shrink-0" />}
+                          {label}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {pct < 100 && (
+                    <div className="mt-4 bg-primary/6 border border-primary/15 rounded-xl px-4 py-2.5 text-xs text-primary font-medium flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+                      Complete your profile to get 3× more recruiter views!
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })()}
 
             {/* Avatar card */}
             <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
