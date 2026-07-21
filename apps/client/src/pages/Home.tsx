@@ -26,7 +26,35 @@ const PUBLIC_NAV = [
 const SEEKER_NAV = [
   { label: "Home", href: "/" },
 ];
-const LANGUAGES = ["EN", "FR", "ES", "DE", "AR"];
+type LangCode = "EN" | "HI" | "ES" | "FR" | "DE" | "AR" | "ZH" | "PT" | "JA" | "KO";
+const LANGUAGES: { code: LangCode; native: string }[] = [
+  { code: "EN", native: "English" },
+  { code: "HI", native: "हिन्दी" },
+  { code: "ES", native: "Español" },
+  { code: "FR", native: "Français" },
+  { code: "DE", native: "Deutsch" },
+  { code: "AR", native: "العربية" },
+  { code: "ZH", native: "中文" },
+  { code: "PT", native: "Português" },
+  { code: "JA", native: "日本語" },
+  { code: "KO", native: "한국어" },
+];
+const TRANSLATIONS: Record<LangCode, Record<string, string>> = {
+  EN: {},
+  HI: { "Browse Jobs":"नौकरियां देखें","Dashboard":"डैशबोर्ड","Quick Filters":"त्वरित फ़िल्टर","Jobs Near You":"आपके पास नौकरियां","Companies Hiring Near You":"पास की भर्ती कंपनियां","Recently Viewed":"हाल में देखा गया","Apply Now":"अभी आवेदन करें","Notifications":"सूचनाएं","Browse Jobs section":"नौकरियां ब्राउज़ करें","Sign In":"साइन इन","Search Radius":"खोज त्रिज्या" },
+  ES: { "Browse Jobs":"Ver Empleos","Dashboard":"Panel","Quick Filters":"Filtros Rápidos","Jobs Near You":"Empleos Cerca","Companies Hiring Near You":"Empresas Contratando","Recently Viewed":"Vistos Recientemente","Apply Now":"Aplicar Ahora","Notifications":"Notificaciones","Browse Jobs section":"Explorar Empleos","Sign In":"Iniciar Sesión","Search Radius":"Radio de búsqueda" },
+  FR: { "Browse Jobs":"Voir les Emplois","Dashboard":"Tableau de bord","Quick Filters":"Filtres Rapides","Jobs Near You":"Emplois Près de Vous","Companies Hiring Near You":"Entreprises qui Recrutent","Recently Viewed":"Récemment Consultés","Apply Now":"Postuler","Notifications":"Notifications","Browse Jobs section":"Explorer les Emplois","Sign In":"Se Connecter","Search Radius":"Rayon de recherche" },
+  DE: { "Browse Jobs":"Jobs Durchsuchen","Dashboard":"Armaturenbrett","Quick Filters":"Schnellfilter","Jobs Near You":"Jobs in Ihrer Nähe","Companies Hiring Near You":"Einstellende Unternehmen","Recently Viewed":"Zuletzt Gesehen","Apply Now":"Jetzt Bewerben","Notifications":"Benachrichtigungen","Browse Jobs section":"Jobs Erkunden","Sign In":"Anmelden","Search Radius":"Suchradius" },
+  AR: { "Browse Jobs":"تصفح الوظائف","Dashboard":"لوحة التحكم","Quick Filters":"تصفية سريعة","Jobs Near You":"وظائف قريبة","Companies Hiring Near You":"شركات توظف قريبًا","Recently Viewed":"شوهد مؤخراً","Apply Now":"قدّم الآن","Notifications":"الإشعارات","Browse Jobs section":"استكشاف الوظائف","Sign In":"تسجيل الدخول","Search Radius":"نطاق البحث" },
+  ZH: { "Browse Jobs":"浏览职位","Dashboard":"仪表板","Quick Filters":"快速筛选","Jobs Near You":"附近职位","Companies Hiring Near You":"附近招聘","Recently Viewed":"最近浏览","Apply Now":"立即申请","Notifications":"通知","Browse Jobs section":"探索职位","Sign In":"登录","Search Radius":"搜索半径" },
+  PT: { "Browse Jobs":"Ver Empregos","Dashboard":"Painel","Quick Filters":"Filtros Rápidos","Jobs Near You":"Empregos Perto","Companies Hiring Near You":"Empresas Contratando","Recently Viewed":"Vistos Recentemente","Apply Now":"Candidatar-se","Notifications":"Notificações","Browse Jobs section":"Explorar Empregos","Sign In":"Entrar","Search Radius":"Raio de busca" },
+  JA: { "Browse Jobs":"求人を探す","Dashboard":"ダッシュボード","Quick Filters":"クイックフィルター","Jobs Near You":"近くの求人","Companies Hiring Near You":"採用中の企業","Recently Viewed":"最近見た","Apply Now":"今すぐ応募","Notifications":"通知","Browse Jobs section":"求人を探索","Sign In":"サインイン","Search Radius":"検索半径" },
+  KO: { "Browse Jobs":"채용 보기","Dashboard":"대시보드","Quick Filters":"빠른 필터","Jobs Near You":"주변 채용","Companies Hiring Near You":"주변 채용 기업","Recently Viewed":"최근 본 공고","Apply Now":"지금 지원","Notifications":"알림","Browse Jobs section":"채용 탐색","Sign In":"로그인","Search Radius":"검색 반경" },
+};
+function t(key: string, lang: LangCode): string {
+  if (lang === "EN") return key;
+  return TRANSLATIONS[lang]?.[key] ?? key;
+}
 
 /* ─── Home page constants ─────────────────────────────────────── */
 const QUICK_FILTERS = ["Full Time", "Part Time", "Internship", "Remote", "Fresher", "Nearby", "High Salary", "Recently Posted"];
@@ -67,7 +95,7 @@ interface HomeJob {
 
 
 /* ─── Globe / language menu ──────────────────────────────────── */
-function GlobeMenu({ lang, setLang }: { lang: string; setLang: (l: string) => void }) {
+function GlobeMenu({ lang, setLang }: { lang: LangCode; setLang: (l: LangCode) => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -75,21 +103,25 @@ function GlobeMenu({ lang, setLang }: { lang: string; setLang: (l: string) => vo
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
+  const current = LANGUAGES.find(l => l.code === lang) ?? LANGUAGES[0]!;
   return (
     <div className="relative" ref={ref}>
       <button onClick={() => setOpen(o => !o)} title="Language"
-        className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors">
-        <Globe className="w-[18px] h-[18px]" />
+        className="flex items-center gap-1.5 px-2.5 h-9 rounded-full text-sm font-semibold text-muted-foreground hover:bg-secondary transition-colors border border-border/50">
+        <Globe className="w-4 h-4 flex-shrink-0" />
+        <span className="hidden sm:inline">{current.code}</span>
       </button>
       <AnimatePresence>
         {open && (
           <motion.div initial={{ opacity: 0, y: 6, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 6, scale: 0.96 }} transition={{ duration: 0.12 }}
-            className="absolute right-0 top-11 bg-white rounded-xl shadow-lg border border-border/60 py-1 w-24 z-50">
+            className="absolute right-0 top-11 bg-white rounded-xl shadow-xl border border-border/60 py-1.5 w-44 z-50 max-h-72 overflow-y-auto">
+            <p className="px-3 pb-1.5 pt-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 border-b border-border/40 mb-1">Language</p>
             {LANGUAGES.map(l => (
-              <button key={l} onClick={() => { setLang(l); setOpen(false); }}
-                className={`w-full text-left px-4 py-2 text-sm font-medium transition-colors ${lang === l ? "text-primary bg-primary/5" : "text-foreground hover:bg-secondary"}`}>
-                {l}
+              <button key={l.code} onClick={() => { setLang(l.code); setOpen(false); }}
+                className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between gap-2 ${lang === l.code ? "text-primary bg-primary/5 font-semibold" : "text-foreground hover:bg-secondary font-medium"}`}>
+                <span>{l.native}</span>
+                <span className="text-[10px] font-bold text-muted-foreground/50 flex-shrink-0">{l.code}</span>
               </button>
             ))}
           </motion.div>
@@ -173,39 +205,129 @@ function ProfileMenu({ user, navigate }: { user: AuthUser; navigate: (p: string)
 }
 
 /* ─── Notification bell ──────────────────────────────────────── */
-function NotificationBell() {
+interface HomeNotif {
+  id: string; title: string; body: string; read: boolean;
+  time: string; logo: string; logoColor: string; type: string;
+}
+function NotificationBell({ lang }: { lang: LangCode }) {
   const [open, setOpen] = useState(false);
+  const [notifs, setNotifs] = useState<HomeNotif[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem("jn_token");
+    if (!token) { setLoaded(true); return; }
+    fetch("/api/notifications", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then((data: unknown) => {
+        if (Array.isArray(data)) {
+          setNotifs((data as Record<string, unknown>[]).map(n => ({
+            id: String(n["_id"] ?? n["id"] ?? Math.random()),
+            title: String(n["title"] ?? ""),
+            body: String(n["body"] ?? ""),
+            read: Boolean(n["read"]),
+            time: n["createdAt"] ? new Date(String(n["createdAt"])).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "now",
+            logo: String(n["title"] ?? "?").slice(0, 2).toUpperCase(),
+            logoColor: "bg-blue-500",
+            type: String(n["type"] ?? "info"),
+          })));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  const unread = notifs.filter(n => !n.read).length;
+
+  const markRead = (id: string) => {
+    setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    const token = localStorage.getItem("jn_token");
+    if (token) fetch(`/api/notifications/${id}/read`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+  };
+
+  const markAllRead = () => {
+    setNotifs(prev => prev.map(n => ({ ...n, read: true })));
+    const token = localStorage.getItem("jn_token");
+    if (token) fetch("/api/notifications/read-all", { method: "PATCH", headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+  };
+
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(o => !o)} title="Notifications"
+      <button onClick={() => setOpen(o => !o)} title={t("Notifications", lang)}
         className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors relative">
         <Bell className="w-[18px] h-[18px]" />
-        <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary border-2 border-white" />
+        {unread > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-primary text-white text-[9px] font-bold flex items-center justify-center px-0.5 border-2 border-white">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+        {unread === 0 && loaded && notifs.length === 0 && (
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-border/60 border-2 border-white" />
+        )}
       </button>
       <AnimatePresence>
         {open && (
           <motion.div initial={{ opacity: 0, y: 6, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 6, scale: 0.96 }} transition={{ duration: 0.12 }}
-            className="absolute right-0 top-11 bg-white rounded-xl shadow-lg border border-border/60 w-80 z-50 overflow-hidden">
+            className="absolute right-0 top-11 bg-white rounded-xl shadow-xl border border-border/60 w-80 z-50 overflow-hidden">
             <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between">
-              <p className="text-sm font-bold">Notifications</p>
-              <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">0 new</span>
-            </div>
-            <div className="py-12 flex flex-col items-center text-center px-6">
-              <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center mb-3">
-                <Bell className="w-6 h-6 text-muted-foreground/40" />
+              <p className="text-sm font-bold">{t("Notifications", lang)}</p>
+              <div className="flex items-center gap-2">
+                {unread > 0 && (
+                  <button onClick={markAllRead} className="text-[10px] font-semibold text-primary hover:text-primary/80 transition-colors">
+                    Mark all read
+                  </button>
+                )}
+                <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">
+                  {unread} new
+                </span>
               </div>
-              <p className="text-sm font-semibold text-foreground">No new notifications</p>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                We'll let you know when new jobs matching your profile are posted nearby.
-              </p>
             </div>
+            <div className="max-h-72 overflow-y-auto divide-y divide-border/30">
+              {!loaded ? (
+                <div className="py-8 text-center"><div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" /></div>
+              ) : notifs.length === 0 ? (
+                <div className="py-10 flex flex-col items-center text-center px-6">
+                  <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center mb-3">
+                    <Bell className="w-6 h-6 text-muted-foreground/40" />
+                  </div>
+                  <p className="text-sm font-semibold">No notifications yet</p>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">We'll alert you when jobs matching your profile are posted nearby.</p>
+                </div>
+              ) : (
+                notifs.map(n => (
+                  <button key={n.id} onClick={() => markRead(n.id)}
+                    className={`w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-secondary/40 transition-colors ${!n.read ? "bg-primary/4" : ""}`}>
+                    <div className={`w-9 h-9 rounded-xl ${n.logoColor} flex items-center justify-center text-white text-xs font-extrabold flex-shrink-0`}>
+                      {n.logo}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <p className="text-xs font-bold truncate">{n.title}</p>
+                        {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0 ml-auto" />}
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-snug line-clamp-2">{n.body}</p>
+                      <p className="text-[10px] text-muted-foreground/50 mt-1">{n.time}</p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+            {notifs.length > 0 && (
+              <div className="px-4 py-2.5 border-t border-border/50">
+                <button onClick={() => { setOpen(false); window.location.href = "/dashboard/seeker"; }}
+                  className="w-full text-xs font-semibold text-primary hover:text-primary/80 transition-colors py-1 text-center">
+                  View all in Dashboard →
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -636,7 +758,7 @@ function AuthenticatedSeekerHome({ user, navigate }: { user: AuthUser; navigate:
           </nav>
           <div className="flex items-center gap-2">
             <GlobeMenu lang={lang} setLang={setLang} />
-            <NotificationBell />
+            <NotificationBell lang={lang} />
             <ProfileMenu user={user} navigate={navigate} />
           </div>
         </div>
